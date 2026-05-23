@@ -1,5 +1,8 @@
 package com.moim.domain.room.service;
 
+import com.moim.domain.location.entity.Place;
+import com.moim.domain.location.repository.PlaceRepository;
+import com.moim.domain.room.dto.ConfirmRequest;
 import com.moim.domain.room.dto.RoomCreateRequest;
 import com.moim.domain.room.dto.RoomResponse;
 import com.moim.domain.room.entity.*;
@@ -22,6 +25,7 @@ public class RoomService {
 
     private final RoomRepository roomRepository;
     private final RoomParticipantRepository roomParticipantRepository;
+    private final PlaceRepository placeRepository;
 
     @Transactional
     public RoomResponse createRoom(RoomCreateRequest request, User host) {
@@ -79,6 +83,36 @@ public class RoomService {
             throw new BusinessException(ErrorCode.HOST_ONLY);
         }
         roomRepository.delete(room);
+    }
+
+    @Transactional
+    public RoomResponse confirmRoom(UUID roomId, ConfirmRequest request, User requester) {
+        Room room = findRoom(roomId);
+        if (!room.isHost(requester.getId())) {
+            throw new BusinessException(ErrorCode.HOST_ONLY);
+        }
+        if (room.getStatus() != RoomStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.ROOM_NOT_ACTIVE);
+        }
+
+        Place confirmedPlace = null;
+        if (request.getPlaceId() != null) {
+            // IDOR 방지: 이 방 소속 장소인지 검증
+            confirmedPlace = placeRepository.findByIdAndRoomId(request.getPlaceId(), roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PLACE_NOT_FOUND));
+        }
+
+        room.confirm(request.getDate(), confirmedPlace);
+        return RoomResponse.from(room);
+    }
+
+    @Transactional(readOnly = true)
+    public RoomResponse getResult(UUID roomId) {
+        Room room = findRoom(roomId);
+        if (room.getStatus() != RoomStatus.CONFIRMED) {
+            throw new BusinessException(ErrorCode.ROOM_NOT_ACTIVE);
+        }
+        return RoomResponse.from(room);
     }
 
     private Room findRoom(UUID roomId) {
