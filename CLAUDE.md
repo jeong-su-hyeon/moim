@@ -17,7 +17,11 @@
 | 라우팅 | React Router v6 |
 | 실시간 통신 | STOMP over SockJS (`@stomp/stompjs`, `sockjs-client`) |
 | 지도 | Naver Maps JS API v3 (CDN 스크립트 로드) |
-| 백엔드 (참고) | Spring Boot, MySQL |
+| 백엔드 | Spring Boot 3.x, PostgreSQL |
+| 백엔드 빌드 | Gradle |
+| 백엔드 ORM | Spring Data JPA (Hibernate 6) |
+| 백엔드 인증 | Spring Security + JWT |
+| 백엔드 실시간 | Spring WebSocket + STOMP |
 
 ---
 
@@ -187,6 +191,325 @@ VITE_KAKAO_REST_API_KEY=your_kakao_key
 | 약속방 자동 파기 | 백엔드 스케줄러 처리. 프론트는 만료 방 접근 시 404 화면 표시 |
 | 출발지 정확도 | 대략적 위치(동네 수준) 또는 정확한 주소 선택 허용 |
 | 채팅 UI 참고 | Discord 스타일: 우측 멤버 패널, 날짜별 구분선, 읽지않은 메시지 배지 |
+
+---
+
+---
+
+## 서버 아키텍처
+
+### 패키지 구조
+
+```
+src/main/java/com/moim/
+├── MoimApplication.java
+├── config/
+│   ├── SecurityConfig.java          # Spring Security 필터체인, CORS, 공개/보호 경로
+│   ├── WebSocketConfig.java         # STOMP 브로커, 엔드포인트 등록
+│   ├── JwtChannelInterceptor.java   # WebSocket CONNECT 시 JWT 검증 (★ 별도 필요)
+│   └── SchedulingConfig.java        # @EnableScheduling + ShedLock 설정
+├── domain/
+│   ├── user/
+│   │   ├── entity/User.java
+│   │   ├── repository/UserRepository.java
+│   │   ├── service/UserService.java
+│   │   └── controller/UserController.java
+│   ├── room/
+│   │   ├── entity/Room.java
+│   │   ├── entity/RoomParticipant.java
+│   │   ├── repository/RoomRepository.java
+│   │   ├── repository/RoomParticipantRepository.java
+│   │   ├── service/RoomService.java
+│   │   └── controller/RoomController.java
+│   ├── schedule/
+│   │   ├── entity/Schedule.java
+│   │   ├── repository/ScheduleRepository.java
+│   │   ├── service/ScheduleService.java
+│   │   └── controller/ScheduleController.java
+│   ├── location/
+│   │   ├── entity/Place.java
+│   │   ├── entity/UserOrigin.java
+│   │   ├── entity/TravelTime.java
+│   │   ├── repository/PlaceRepository.java
+│   │   ├── repository/TravelTimeRepository.java
+│   │   ├── service/LocationService.java
+│   │   └── controller/LocationController.java
+│   └── chat/
+│       ├── entity/ChatMessage.java
+│       ├── repository/ChatMessageRepository.java
+│       ├── service/ChatService.java
+│       └── controller/ChatController.java   # @MessageMapping STOMP 핸들러
+├── auth/
+│   ├── jwt/
+│   │   ├── JwtProvider.java
+│   │   ├── JwtAuthenticationFilter.java
+│   │   └── JwtProperties.java              # application.yml 바인딩
+│   ├── oauth2/
+│   │   ├── CustomOAuth2UserService.java    # Google/Kakao 유저 정보 처리
+│   │   ├── OAuth2SuccessHandler.java       # JWT 발급 후 프론트로 리다이렉트
+│   │   └── CookieOAuth2RequestRepository.java  # 인가 요청 쿠키 저장 (★ stateless 필수)
+│   └── controller/AuthController.java      # 로컬 로그인·회원가입·토큰 갱신
+├── global/
+│   ├── exception/
+│   │   ├── GlobalExceptionHandler.java     # @RestControllerAdvice
+│   │   ├── ErrorCode.java                  # enum (코드, HTTP 상태, 메시지)
+│   │   └── BusinessException.java
+│   ├── response/ApiResponse.java           # { success, data, error } 공통 응답 래퍼
+│   └── scheduler/RoomExpiryScheduler.java  # 약속방 자동 파기 크론잡
+└── infra/
+    └── naver/
+        ├── NaverDirectionsClient.java      # Naver Directions API HTTP 호출 (서버사이드)
+        └── NaverDirectionsResponse.java
+```
+
+---
+
+### DB 엔티티 설계
+
+```
+users
+  id            UUID PK default gen_random_uuid()
+  email         VARCHAR(255) UNIQUE NOT NULL
+  name          VARCHAR(100) NOT NULL
+  profile_url   VARCHAR(500)
+  provider      ENUM('LOCAL','GOOGLE','KAKAO') NOT NULL
+  provider_id   VARCHAR(255)                   # 소셜 로그인 식별자
+  created_at    TIMESTAMP NOT NULL
+
+rooms
+  id            UUID PK default gen_random_uuid()
+  title         VARCHAR(200) NOT NULL
+  host_id       UUID FK → users.id NOT NULL
+  status        ENUM('ACTIVE','CONFIRMED','CANCELLED') DEFAULT 'ACTIVE'
+  confirmed_date DATE
+  confirmed_place_id UUID FK → places.id
+  created_at    TIMESTAMP NOT NULL
+  expires_at    TIMESTAMP                      # confirmed_date + 1개월; NULL이면 미확정
+
+room_participants
+  room_id       UUID FK → rooms.id
+  user_id       UUID FK → users.id
+  joined_at     TIMESTAMP NOT NULL
+  PK (room_id, user_id)
+
+schedules
+  id            UUID PK
+  room_id       UUID FK → rooms.id
+  user_id       UUID FK → users.id
+  available_date DATE NOT NULL
+  UNIQUE (room_id, user_id, available_date)
+
+user_origins
+  id            UUID PK
+  room_id       UUID FK → rooms.id
+  user_id       UUID FK → users.id
+  lat           DOUBLE PRECISION NOT NULL
+  lng           DOUBLE PRECISION NOT NULL
+  label         VARCHAR(200)                   # "강남구" 같은 대략적 주소
+  UNIQUE (room_id, user_id)
+
+places
+  id            UUID PK
+  room_id       UUID FK → rooms.id
+  name          VARCHAR(200) NOT NULL
+  address       VARCHAR(500)
+  lat           DOUBLE PRECISION NOT NULL
+  lng           DOUBLE PRECISION NOT NULL
+  registered_by UUID FK → users.id
+  created_at    TIMESTAMP NOT NULL
+
+travel_times
+  id            UUID PK
+  place_id      UUID FK → places.id
+  user_id       UUID FK → users.id
+  transport     ENUM('TRANSIT','CAR','WALK') NOT NULL
+  duration_min  INTEGER NOT NULL               # 분 단위
+  calculated_at TIMESTAMP NOT NULL
+  UNIQUE (place_id, user_id, transport)        # 캐시 역할
+
+chat_messages
+  id            UUID PK
+  room_id       UUID FK → rooms.id
+  user_id       UUID FK → users.id
+  content       TEXT NOT NULL
+  sent_at       TIMESTAMP NOT NULL
+```
+
+CASCADE 전략: `rooms` 삭제 시 하위 테이블 전체 CASCADE DELETE.
+
+---
+
+### REST API 엔드포인트
+
+```
+# 인증
+POST   /api/auth/signup                    # 로컬 회원가입
+POST   /api/auth/login                     # 로컬 로그인 → { accessToken, refreshToken }
+POST   /api/auth/refresh                   # 토큰 갱신
+GET    /api/auth/google                    # Google OAuth 시작 (Spring Security 처리)
+GET    /api/auth/kakao                     # Kakao OAuth 시작
+GET    /api/auth/callback/google           # OAuth 콜백 → 프론트로 ?token=... 리다이렉트
+GET    /api/auth/callback/kakao
+
+# 약속방
+POST   /api/rooms                          # 방 생성
+GET    /api/rooms/{roomId}                 # 방 상세 (참여자 목록 포함)
+POST   /api/rooms/{roomId}/join            # 초대 링크로 방 참가 (10명 초과 시 409)
+DELETE /api/rooms/{roomId}                 # 방 삭제·파토 (host only)
+POST   /api/rooms/{roomId}/confirm         # 날짜+장소 확정 (host only)
+
+# 일정
+POST   /api/rooms/{roomId}/schedules       # 내 가능 날짜 저장 (배열, 덮어쓰기)
+GET    /api/rooms/{roomId}/schedules       # 전체 참여자 날짜 집계 응답
+
+# 장소
+POST   /api/rooms/{roomId}/origins         # 내 출발지 저장
+GET    /api/rooms/{roomId}/origins         # 전체 출발지 조회
+POST   /api/rooms/{roomId}/places          # 후보지 등록
+DELETE /api/rooms/{roomId}/places/{placeId}
+GET    /api/rooms/{roomId}/places/{placeId}/travel-times?transport=TRANSIT
+       # Naver Directions 프록시 → TravelTime 캐시 우선 조회
+
+# 채팅 히스토리 (REST)
+GET    /api/rooms/{roomId}/messages?cursor={lastId}&size=50
+
+# 결과
+GET    /api/rooms/{roomId}/result          # 확정 날짜·장소·시간 요약
+
+# 시간 투표 (선택 기능)
+POST   /api/rooms/{roomId}/time-votes
+GET    /api/rooms/{roomId}/time-votes
+```
+
+---
+
+### WebSocket (STOMP)
+
+```
+연결: ws://host/ws/chat          (SockJS fallback 포함)
+구독: /topic/room/{roomId}       (채팅 메시지 수신)
+발행: /app/room/{roomId}/message (채팅 메시지 전송)
+```
+
+STOMP CONNECT 시 `Authorization: Bearer {token}` 헤더 전달.
+`JwtChannelInterceptor.preSend()`에서 CONNECT 프레임을 가로채 토큰 검증 후 `Principal` 주입.
+
+---
+
+### 인증 설계 주의사항
+
+**1. OAuth2 인가 요청 상태 — 쿠키 기반 필수**
+
+Spring Security 기본 구현(`HttpSessionOAuth2AuthorizationRequestRepository`)은 세션에 상태를 저장하는데, JWT 기반 stateless 서버에서 세션을 쓰면 수평 확장 시 문제 발생.
+→ `CookieOAuth2RequestRepository` 커스텀 구현으로 인가 요청 상태를 서명된 쿠키에 저장.
+
+**2. WebSocket JWT 검증 — Security 필터체인 우회 주의**
+
+Spring Security의 HTTP 필터체인은 HTTP 핸드셰이크 시점까지만 작동. STOMP 레벨 메시지는 별도 `ChannelInterceptor`로 검증해야 함. 이를 빠뜨리면 토큰 없이 채팅 가능한 상태가 됨.
+
+**3. Refresh Token 저장**
+
+Refresh Token은 `HttpOnly + Secure` 쿠키로 내려보내 XSS 탈취 방지. Access Token은 응답 body로 전달, 프론트 메모리(Zustand)에만 보관.
+
+---
+
+### 10명 제한 — 레이스 컨디션 방어
+
+동시에 두 명이 9인 방에 참가 요청 시 둘 다 통과되는 문제 발생 가능.
+
+```java
+// RoomService.joinRoom()
+@Transactional
+public void joinRoom(UUID roomId, UUID userId) {
+    // 비관적 락: 같은 roomId 행에 대해 SELECT ... FOR UPDATE
+    Room room = roomRepository.findByIdWithLock(roomId)
+        .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+
+    if (room.getParticipants().size() >= 10) {
+        throw new BusinessException(ErrorCode.ROOM_FULL);
+    }
+    // 참가 처리
+}
+```
+
+`findByIdWithLock`은 `@Lock(LockModeType.PESSIMISTIC_WRITE)` 적용.
+
+---
+
+### Naver Directions API — 캐싱 전략
+
+후보지 N개 × 참여자 10명 = 최대 N×10회 API 호출. 매 조회마다 호출하면 쿼터 초과 위험.
+
+```
+요청 흐름:
+1. 프론트 → GET /places/{placeId}/travel-times?transport=TRANSIT
+2. LocationService: TravelTime 캐시 조회 (place_id + user_id + transport)
+3. 캐시 HIT  → 저장된 duration_min 반환
+4. 캐시 MISS → NaverDirectionsClient 호출 → 결과를 TravelTime 테이블에 저장 후 반환
+```
+
+출발지나 목적지가 변경되면 해당 `travel_times` 행을 삭제해 캐시 무효화.
+
+---
+
+### 약속방 자동 파기 스케줄러
+
+```java
+// RoomExpiryScheduler.java
+@Scheduled(cron = "0 0 3 * * *")   // 매일 새벽 3시
+@SchedulerLock(name = "roomExpiry", lockAtMostFor = "PT1H")
+public void deleteExpiredRooms() {
+    roomRepository.deleteByExpiresAtBefore(LocalDateTime.now());
+    // CASCADE DELETE로 하위 데이터 일괄 삭제
+}
+```
+
+다중 인스턴스 환경에서 중복 실행 방지를 위해 **ShedLock** 적용 (`shedlock-provider-jdbc-template`).
+`expires_at` 컬럼에 인덱스 필수.
+
+---
+
+### 공통 예외 응답 형식
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "ROOM_FULL",
+    "message": "약속방 인원이 가득 찼습니다."
+  }
+}
+```
+
+`ErrorCode` enum에 HTTP 상태와 메시지 함께 정의. 프론트는 `error.code`로 케이스 분기.
+
+---
+
+### 서버 환경 변수 (`application.yml` / 시스템 환경)
+
+```yaml
+spring:
+  datasource:
+    url: ${DB_URL}                        # jdbc:postgresql://host:5432/moim
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  security:
+    oauth2.client:                        # Google/Kakao 클라이언트 정보
+
+jwt:
+  secret: ${JWT_SECRET}                  # 256비트 이상 랜덤 문자열
+  access-expiry: 3600                    # 1시간 (초)
+  refresh-expiry: 1209600                # 14일 (초)
+
+naver:
+  directions:
+    client-id: ${NAVER_CLIENT_ID}
+    client-secret: ${NAVER_CLIENT_SECRET}
+    base-url: https://naveropenapi.apigw.ntruss.com
+
+app:
+  front-url: ${FRONT_URL}               # 프론트 Origin (CORS + OAuth 리다이렉트)
+```
 
 ---
 
