@@ -1,260 +1,237 @@
 -- ============================================================
---  약속 잡기 서비스 (mo!m) - Database Schema
---  MySQL 8.0
+--  moim — PostgreSQL Schema
+--
+--  실행 순서:
+--  1. postgres DB 콘솔에서 DROP/CREATE DATABASE 실행
+--  2. moim DB로 전환 후 나머지 전체 실행
+--
+--  * UUID DEFAULT 없음 — Hibernate가 애플리케이션에서 생성
+--  * rooms ↔ places 순환 FK는 ALTER TABLE로 분리 처리
 -- ============================================================
 
-CREATE DATABASE IF NOT EXISTS moim
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
 
-USE moim;
+-- ============================================================
+--  [postgres DB 콘솔에서 실행]
+--  기존 moim DB 연결 강제 종료 후 삭제 & 재생성
+-- ============================================================
+SELECT pg_terminate_backend(pid)
+FROM   pg_stat_activity
+WHERE  datname = 'moim'
+  AND  pid <> pg_backend_pid();
+
+DROP DATABASE IF EXISTS moim;
+
+CREATE DATABASE moim ENCODING = 'UTF8';
+
+
+-- ============================================================
+--  [moim DB로 전환 후 실행]
+-- ============================================================
+
 
 -- ============================================================
 -- 1. users
---    이메일/소셜 통합 계정. email은 이메일 가입자만 값이 있음.
 -- ============================================================
 CREATE TABLE users (
-  id               BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
-  email            VARCHAR(255)     UNIQUE,
-  password_hash    VARCHAR(255),
-  nickname         VARCHAR(50)      NOT NULL,
-  profile_image_url VARCHAR(500),
-  created_at       DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at       DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  -- 이메일 가입이면 반드시 비밀번호가 있어야 함 (앱 레이어에서 함께 보장)
-  CONSTRAINT chk_email_login CHECK (
-    (email IS NULL AND password_hash IS NULL) OR
-    (email IS NOT NULL)
-  )
-) ENGINE=InnoDB;
+    id            UUID         NOT NULL,
+    email         VARCHAR(255) NOT NULL,
+    name          VARCHAR(100) NOT NULL,
+    profile_url   VARCHAR(500),
+    password_hash VARCHAR(255),
+    provider      VARCHAR(20)  NOT NULL,
+    provider_id   VARCHAR(255),
+    created_at    TIMESTAMP    NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (id),
+    CONSTRAINT uq_users_email UNIQUE (email)
+);
+
 
 -- ============================================================
--- 2. social_accounts
---    소셜 로그인 연동 (Google / Kakao). 한 유저가 여러 소셜 계정 보유 가능.
+-- 2. rooms  (confirmed_place_id FK는 places 생성 후 추가)
 -- ============================================================
-CREATE TABLE social_accounts (
-  id          BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
-  user_id     BIGINT UNSIGNED  NOT NULL,
-  provider    ENUM('google', 'kakao') NOT NULL,
-  provider_id VARCHAR(255)     NOT NULL,
-  created_at  DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_provider_account (provider, provider_id),
-  CONSTRAINT fk_sa_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+CREATE TABLE rooms (
+    id                 UUID         NOT NULL,
+    title              VARCHAR(200) NOT NULL,
+    host_id            UUID         NOT NULL,
+    status             VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
+    confirmed_date     DATE,
+    confirmed_place_id UUID,
+    created_at         TIMESTAMP    NOT NULL DEFAULT NOW(),
+    expires_at         TIMESTAMP,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_rooms_host FOREIGN KEY (host_id) REFERENCES users (id)
+);
+
 
 -- ============================================================
--- 3. meeting_rooms
---    약속방. uuid는 초대 링크 끝에 붙는 고유값.
---    최대 참여 인원 10명 제약은 room_participants INSERT 시 앱/트리거로 강제.
---    expires_at: 약속 확정일 기준 +1개월, 스케줄러로 자동 파기.
--- ============================================================
-CREATE TABLE meeting_rooms (
-  id                     BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
-  uuid                   CHAR(36)         NOT NULL,
-  title                  VARCHAR(100)     NOT NULL,
-  description            TEXT,
-  creator_id             BIGINT UNSIGNED  NOT NULL,
-  status                 ENUM('active', 'confirmed', 'cancelled') NOT NULL DEFAULT 'active',
-  confirmed_date         DATE,
-  confirmed_time         TIME,
-  confirmed_location_id  BIGINT UNSIGNED,          -- candidate_locations FK: 후방 선언
-  expires_at             DATETIME,                 -- confirmed_date + INTERVAL 1 MONTH
-  created_at             DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at             DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_room_uuid (uuid),
-  CONSTRAINT fk_mr_creator FOREIGN KEY (creator_id) REFERENCES users(id)
-) ENGINE=InnoDB;
-
--- ============================================================
--- 4. room_participants
---    방 참여자. host = 방 생성자(creator), member = 일반 참여자.
---    최대 10명 제약을 트리거로 보장.
+-- 3. room_participants  (복합 PK)
 -- ============================================================
 CREATE TABLE room_participants (
-  id        BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
-  room_id   BIGINT UNSIGNED  NOT NULL,
-  user_id   BIGINT UNSIGNED  NOT NULL,
-  role      ENUM('host', 'member') NOT NULL DEFAULT 'member',
-  joined_at DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_room_user (room_id, user_id),
-  CONSTRAINT fk_rp_room FOREIGN KEY (room_id) REFERENCES meeting_rooms(id) ON DELETE CASCADE,
-  CONSTRAINT fk_rp_user FOREIGN KEY (user_id) REFERENCES users(id)     ON DELETE CASCADE
-) ENGINE=InnoDB;
+    room_id   UUID      NOT NULL,
+    user_id   UUID      NOT NULL,
+    joined_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (room_id, user_id),
+    CONSTRAINT fk_rp_room FOREIGN KEY (room_id) REFERENCES rooms (id) ON DELETE CASCADE,
+    CONSTRAINT fk_rp_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
 
--- 참여 인원 10명 초과 방지 트리거
-DELIMITER $$
-CREATE TRIGGER trg_max_participants
-BEFORE INSERT ON room_participants
-FOR EACH ROW
-BEGIN
-  DECLARE cnt INT;
-  SELECT COUNT(*) INTO cnt FROM room_participants WHERE room_id = NEW.room_id;
-  IF cnt >= 10 THEN
-    SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = '약속방 최대 참여 인원(10명)을 초과할 수 없습니다.';
-  END IF;
-END$$
-DELIMITER ;
 
 -- ============================================================
--- 5. date_availability
---    참여자별 가능 날짜. 캘린더 UI에서 선택한 날짜마다 한 행.
+-- 4. schedules  — 참여자별 가능 날짜
 -- ============================================================
-CREATE TABLE date_availability (
-  id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  room_id        BIGINT UNSIGNED NOT NULL,
-  user_id        BIGINT UNSIGNED NOT NULL,
-  available_date DATE            NOT NULL,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_availability (room_id, user_id, available_date),
-  CONSTRAINT fk_da_room FOREIGN KEY (room_id) REFERENCES meeting_rooms(id) ON DELETE CASCADE,
-  CONSTRAINT fk_da_user FOREIGN KEY (user_id) REFERENCES users(id)         ON DELETE CASCADE
-) ENGINE=InnoDB;
+CREATE TABLE schedules (
+    id             UUID NOT NULL,
+    room_id        UUID NOT NULL,
+    user_id        UUID NOT NULL,
+    available_date DATE NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uq_schedule  UNIQUE (room_id, user_id, available_date),
+    CONSTRAINT fk_sch_room  FOREIGN KEY (room_id) REFERENCES rooms (id) ON DELETE CASCADE,
+    CONSTRAINT fk_sch_user  FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
 
 -- ============================================================
--- 6. departure_locations
---    참여자별 출발지 (방당 1개). is_approximate: 대략적 위치 여부.
+-- 5. user_origins  — 참여자 출발지 (방당 1개)
 -- ============================================================
-CREATE TABLE departure_locations (
-  id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  room_id        BIGINT UNSIGNED NOT NULL,
-  user_id        BIGINT UNSIGNED NOT NULL,
-  address        VARCHAR(500),
-  latitude       DECIMAL(10, 7)  NOT NULL,
-  longitude      DECIMAL(10, 7)  NOT NULL,
-  is_approximate TINYINT(1)      NOT NULL DEFAULT 0,
-  created_at     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_departure (room_id, user_id),
-  CONSTRAINT fk_dl_room FOREIGN KEY (room_id) REFERENCES meeting_rooms(id) ON DELETE CASCADE,
-  CONSTRAINT fk_dl_user FOREIGN KEY (user_id) REFERENCES users(id)         ON DELETE CASCADE
-) ENGINE=InnoDB;
+CREATE TABLE user_origins (
+    id      UUID             NOT NULL,
+    room_id UUID             NOT NULL,
+    user_id UUID             NOT NULL,
+    lat     DOUBLE PRECISION NOT NULL,
+    lng     DOUBLE PRECISION NOT NULL,
+    label   VARCHAR(200),
+    PRIMARY KEY (id),
+    CONSTRAINT uq_origin  UNIQUE (room_id, user_id),
+    CONSTRAINT fk_uo_room FOREIGN KEY (room_id) REFERENCES rooms (id) ON DELETE CASCADE,
+    CONSTRAINT fk_uo_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
 
 -- ============================================================
--- 7. candidate_locations
---    후보 장소. Naver 지도 API로 검색 후 핀을 찍어 등록.
+-- 6. places  — 후보 장소
 -- ============================================================
-CREATE TABLE candidate_locations (
-  id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  room_id        BIGINT UNSIGNED NOT NULL,
-  proposed_by    BIGINT UNSIGNED NOT NULL,
-  name           VARCHAR(200)    NOT NULL,
-  address        VARCHAR(500)    NOT NULL,
-  latitude       DECIMAL(10, 7)  NOT NULL,
-  longitude      DECIMAL(10, 7)  NOT NULL,
-  category       VARCHAR(100),                   -- 음식점, 카페 등
-  naver_place_id VARCHAR(100),                   -- Naver 장소 고유 ID
-  created_at     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  CONSTRAINT fk_cl_room     FOREIGN KEY (room_id)     REFERENCES meeting_rooms(id) ON DELETE CASCADE,
-  CONSTRAINT fk_cl_proposer FOREIGN KEY (proposed_by) REFERENCES users(id)
-) ENGINE=InnoDB;
+CREATE TABLE places (
+    id            UUID             NOT NULL,
+    room_id       UUID             NOT NULL,
+    name          VARCHAR(200)     NOT NULL,
+    address       VARCHAR(500),
+    lat           DOUBLE PRECISION NOT NULL,
+    lng           DOUBLE PRECISION NOT NULL,
+    registered_by UUID             NOT NULL,
+    created_at    TIMESTAMP        NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (id),
+    CONSTRAINT fk_pl_room FOREIGN KEY (room_id)       REFERENCES rooms (id) ON DELETE CASCADE,
+    CONSTRAINT fk_pl_user FOREIGN KEY (registered_by) REFERENCES users (id)
+);
 
--- confirmed_location_id FK (candidate_locations 생성 후 추가)
-ALTER TABLE meeting_rooms
-  ADD CONSTRAINT fk_mr_confirmed_location
-  FOREIGN KEY (confirmed_location_id)
-  REFERENCES candidate_locations(id)
-  ON DELETE SET NULL;
+-- rooms.confirmed_place_id FK — 순환 참조이므로 places 생성 후 추가
+ALTER TABLE rooms
+    ADD CONSTRAINT fk_rooms_confirmed_place
+    FOREIGN KEY (confirmed_place_id) REFERENCES places (id) ON DELETE SET NULL;
+
 
 -- ============================================================
--- 8. travel_times
---    Naver 길찾기 API 호출 결과 캐시.
---    (candidate_location, departure_location, transport_mode) 조합당 저장.
+-- 7. travel_times  — Naver Directions 결과 캐시
 -- ============================================================
 CREATE TABLE travel_times (
-  id                    BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  candidate_location_id BIGINT UNSIGNED NOT NULL,
-  departure_location_id BIGINT UNSIGNED NOT NULL,
-  user_id               BIGINT UNSIGNED NOT NULL,
-  transport_mode        ENUM('transit', 'car', 'walk', 'bike') NOT NULL DEFAULT 'transit',
-  estimated_minutes     SMALLINT UNSIGNED NOT NULL,
-  departure_time        DATETIME,                 -- 출발 기준 시각 (null이면 현재 기준)
-  calculated_at         DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_travel (candidate_location_id, departure_location_id, transport_mode, departure_time),
-  CONSTRAINT fk_tt_candidate  FOREIGN KEY (candidate_location_id) REFERENCES candidate_locations(id) ON DELETE CASCADE,
-  CONSTRAINT fk_tt_departure  FOREIGN KEY (departure_location_id) REFERENCES departure_locations(id) ON DELETE CASCADE,
-  CONSTRAINT fk_tt_user       FOREIGN KEY (user_id)               REFERENCES users(id)               ON DELETE CASCADE
-) ENGINE=InnoDB;
+    id            UUID        NOT NULL,
+    place_id      UUID        NOT NULL,
+    user_id       UUID        NOT NULL,
+    transport     VARCHAR(20) NOT NULL,
+    duration_min  INTEGER     NOT NULL,
+    calculated_at TIMESTAMP   NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (id),
+    CONSTRAINT uq_travel   UNIQUE (place_id, user_id, transport),
+    CONSTRAINT fk_tt_place FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE CASCADE,
+    CONSTRAINT fk_tt_user  FOREIGN KEY (user_id)  REFERENCES users  (id) ON DELETE CASCADE
+);
+
 
 -- ============================================================
--- 9. time_vote_sessions
---    '시간 정하기' 투표 세션. 방당 최대 1개, 선택적으로 활성화.
--- ============================================================
-CREATE TABLE time_vote_sessions (
-  id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  room_id    BIGINT UNSIGNED NOT NULL,
-  created_by BIGINT UNSIGNED NOT NULL,
-  is_active  TINYINT(1)      NOT NULL DEFAULT 1,
-  created_at DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_tvs_room (room_id),
-  CONSTRAINT fk_tvs_room FOREIGN KEY (room_id)    REFERENCES meeting_rooms(id) ON DELETE CASCADE,
-  CONSTRAINT fk_tvs_user FOREIGN KEY (created_by) REFERENCES users(id)
-) ENGINE=InnoDB;
-
--- ============================================================
--- 10. time_vote_options
---     투표 시간대 선택지 (예: 12:00, 14:00, 18:00 ...).
--- ============================================================
-CREATE TABLE time_vote_options (
-  id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  session_id BIGINT UNSIGNED NOT NULL,
-  time_slot  TIME            NOT NULL,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_tvo_slot (session_id, time_slot),
-  CONSTRAINT fk_tvo_session FOREIGN KEY (session_id) REFERENCES time_vote_sessions(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
--- ============================================================
--- 11. time_votes
---     참여자의 시간대 투표. 1인 1옵션 투표.
--- ============================================================
-CREATE TABLE time_votes (
-  id        BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  option_id BIGINT UNSIGNED NOT NULL,
-  user_id   BIGINT UNSIGNED NOT NULL,
-  voted_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_tv_option_user (option_id, user_id),
-  CONSTRAINT fk_tv_option FOREIGN KEY (option_id) REFERENCES time_vote_options(id) ON DELETE CASCADE,
-  CONSTRAINT fk_tv_user   FOREIGN KEY (user_id)   REFERENCES users(id)             ON DELETE CASCADE
-) ENGINE=InnoDB;
-
--- ============================================================
--- 12. chat_messages
---     실시간 채팅. system 타입은 user_id가 NULL (입장/퇴장 알림 등).
+-- 8. chat_messages
 -- ============================================================
 CREATE TABLE chat_messages (
-  id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  room_id      BIGINT UNSIGNED NOT NULL,
-  user_id      BIGINT UNSIGNED,                           -- NULL: 시스템 메시지
-  content      TEXT            NOT NULL,
-  message_type ENUM('text', 'image', 'system') NOT NULL DEFAULT 'text',
-  is_deleted   TINYINT(1)      NOT NULL DEFAULT 0,
-  created_at   DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),  -- 밀리초 정밀도
-  PRIMARY KEY (id),
-  INDEX idx_chat_room_time (room_id, created_at),
-  CONSTRAINT fk_cm_room FOREIGN KEY (room_id) REFERENCES meeting_rooms(id) ON DELETE CASCADE,
-  CONSTRAINT fk_cm_user FOREIGN KEY (user_id) REFERENCES users(id)         ON DELETE SET NULL
-) ENGINE=InnoDB;
+    id      UUID      NOT NULL,
+    room_id UUID      NOT NULL,
+    user_id UUID      NOT NULL,
+    content TEXT      NOT NULL,
+    sent_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (id),
+    CONSTRAINT fk_cm_room FOREIGN KEY (room_id) REFERENCES rooms (id) ON DELETE CASCADE,
+    CONSTRAINT fk_cm_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_chat_room_sent ON chat_messages (room_id, sent_at DESC);
+
 
 -- ============================================================
--- MySQL Event Scheduler: 만료된 약속방 자동 파기 (매일 03:00 실행)
+-- 9. time_vote_sessions  — 시간 투표 세션 (방당 최대 1개)
 -- ============================================================
-SET GLOBAL event_scheduler = ON;
+CREATE TABLE time_vote_sessions (
+    id         UUID      NOT NULL,
+    room_id    UUID      NOT NULL,
+    created_by UUID      NOT NULL,
+    is_active  BOOLEAN   NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (id),
+    CONSTRAINT uq_tvs_room UNIQUE (room_id),
+    CONSTRAINT fk_tvs_room FOREIGN KEY (room_id)    REFERENCES rooms (id) ON DELETE CASCADE,
+    CONSTRAINT fk_tvs_user FOREIGN KEY (created_by) REFERENCES users (id)
+);
 
-CREATE EVENT IF NOT EXISTS evt_purge_expired_rooms
-  ON SCHEDULE EVERY 1 DAY
-  STARTS (DATE(NOW()) + INTERVAL 1 DAY + INTERVAL 3 HOUR)
-  DO
-    DELETE FROM meeting_rooms
-    WHERE expires_at IS NOT NULL
-      AND expires_at < NOW()
-      AND status = 'confirmed';
+
+-- ============================================================
+-- 10. time_vote_options  — 투표 시간대 선택지
+-- ============================================================
+CREATE TABLE time_vote_options (
+    id         UUID NOT NULL,
+    session_id UUID NOT NULL,
+    time_slot  TIME NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uq_tvo_slot    UNIQUE (session_id, time_slot),
+    CONSTRAINT fk_tvo_session FOREIGN KEY (session_id) REFERENCES time_vote_sessions (id) ON DELETE CASCADE
+);
+
+
+-- ============================================================
+-- 11. time_votes  — 참여자별 시간대 투표
+-- ============================================================
+CREATE TABLE time_votes (
+    id        UUID      NOT NULL,
+    option_id UUID      NOT NULL,
+    user_id   UUID      NOT NULL,
+    voted_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (id),
+    CONSTRAINT uq_tv_option_user UNIQUE (option_id, user_id),
+    CONSTRAINT fk_tv_option FOREIGN KEY (option_id) REFERENCES time_vote_options (id) ON DELETE CASCADE,
+    CONSTRAINT fk_tv_user   FOREIGN KEY (user_id)   REFERENCES users             (id) ON DELETE CASCADE
+);
+
+
+-- ============================================================
+-- 12. refresh_tokens  — JWT Refresh Token 해시 저장
+-- ============================================================
+CREATE TABLE refresh_tokens (
+    id         UUID         NOT NULL,
+    user_id    UUID         NOT NULL,
+    token_hash VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMP    NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_rt_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_refresh_user    ON refresh_tokens (user_id);
+CREATE INDEX idx_rooms_expires_at ON rooms (expires_at) WHERE expires_at IS NOT NULL;
+
+
+-- ============================================================
+-- 13. shedlock  — 분산 스케줄러 중복 실행 방지
+-- ============================================================
+CREATE TABLE shedlock (
+    name       VARCHAR(64)  NOT NULL,
+    lock_until TIMESTAMP    NOT NULL,
+    locked_at  TIMESTAMP    NOT NULL,
+    locked_by  VARCHAR(255) NOT NULL,
+    PRIMARY KEY (name)
+);
