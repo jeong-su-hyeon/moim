@@ -1,1 +1,9 @@
 .env
+
+# Gradle 빌드 캐시
+.gradle/
+build/
+
+# IntelliJ IDEA
+.idea/
+*.iml

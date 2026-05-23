@@ -38,7 +38,7 @@ public class AuthController {
             HttpServletResponse response) {
         if (refreshToken == null) {
             return ResponseEntity.status(401)
-                .body(ApiResponse.error("INVALID_TOKEN", "Refresh token이 없습니다."));
+                .body(ApiResponse.<TokenResponse>error("INVALID_TOKEN", "Refresh token이 없습니다."));
         }
         return ResponseEntity.ok(ApiResponse.ok(authService.refresh(refreshToken, response)));
     }

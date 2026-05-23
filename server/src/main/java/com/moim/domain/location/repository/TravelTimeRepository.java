@@ -18,4 +18,9 @@ public interface TravelTimeRepository extends JpaRepository<TravelTime, UUID> {
     @Modifying
     @Query("DELETE FROM TravelTime t WHERE t.place.id = :placeId")
     void deleteByPlaceId(@Param("placeId") UUID placeId);
+
+    // 출발지 변경 시 해당 사용자의 모든 이동시간 캐시 무효화 (서브쿼리로 다중 테이블 참조 회피)
+    @Modifying
+    @Query("DELETE FROM TravelTime t WHERE t.place.id IN (SELECT p.id FROM Place p WHERE p.room.id = :roomId) AND t.user.id = :userId")
+    void deleteByRoomIdAndUserId(@Param("roomId") UUID roomId, @Param("userId") UUID userId);
 }

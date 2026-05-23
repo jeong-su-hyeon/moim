@@ -1,5 +1,6 @@
 package com.moim.domain.room.controller;
 
+import com.moim.domain.room.dto.ConfirmRequest;
 import com.moim.domain.room.dto.RoomCreateRequest;
 import com.moim.domain.room.dto.RoomResponse;
 import com.moim.domain.room.service.RoomService;
@@ -48,5 +49,18 @@ public class RoomController {
             @AuthenticationPrincipal User user) {
         roomService.deleteRoom(roomId, user);
         return ResponseEntity.ok(ApiResponse.ok());
+    }
+
+    @PostMapping("/{roomId}/confirm")
+    public ResponseEntity<ApiResponse<RoomResponse>> confirmRoom(
+            @PathVariable UUID roomId,
+            @Valid @RequestBody ConfirmRequest request,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.ok(roomService.confirmRoom(roomId, request, user)));
+    }
+
+    @GetMapping("/{roomId}/result")
+    public ResponseEntity<ApiResponse<RoomResponse>> getResult(@PathVariable UUID roomId) {
+        return ResponseEntity.ok(ApiResponse.ok(roomService.getResult(roomId)));
     }
 }
