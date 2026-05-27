@@ -48,7 +48,7 @@ naver:
     base-url: https://naveropenapi.apigw.ntruss.com
 
 app:
-  front-url: ${FRONT_URL:http://localhost:5173}
+  front-url: ${FRONT_URL:http://localhost:3000}
 
 server:
   port: 8000

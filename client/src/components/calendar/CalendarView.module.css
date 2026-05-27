@@ -1,0 +1,128 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.navBtn {
+  padding: 4px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.navBtn:hover {
+  background: #f0f0f0;
+}
+
+.monthLabel {
+  font-size: 16px;
+  font-weight: 600;
+  min-width: 100px;
+  text-align: center;
+}
+
+.legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #555;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  flex: 1;
+}
+
+.weekday {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  padding: 4px 0;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  cursor: pointer;
+  gap: 2px;
+  transition: background 0.1s;
+}
+
+.cell:hover {
+  background: #f5f5f5;
+}
+
+.cellSelected {
+  border-color: #1a73e8;
+  background: #e8f0fe;
+}
+
+.dayNum {
+  font-size: 14px;
+}
+
+.countBadge {
+  font-size: 10px;
+  color: #1e88e5;
+  font-weight: 600;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+  margin-top: 8px;
+}
+
+.selectedInfo {
+  font-size: 13px;
+  color: #555;
+}
+
+.saveBtn {
+  padding: 6px 20px;
+  background: #1a73e8;
+  color: #fff;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.saveBtn:hover {
+  background: #1558b0;
+}

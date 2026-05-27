@@ -41,7 +41,7 @@ public class Room {
     private LocalDate confirmedDate;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "confirmed_place_id")
+    @JoinColumn(name = "confirmed_place_id", columnDefinition = "uuid")
     private Place confirmedPlace;
 
     @CreationTimestamp

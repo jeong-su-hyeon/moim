@@ -14,9 +14,9 @@ import java.util.UUID;
 @EqualsAndHashCode
 public class RoomParticipantId implements Serializable {
 
-    @Column(name = "room_id")
+    @Column(name = "room_id", columnDefinition = "uuid")
     private UUID roomId;
 
-    @Column(name = "user_id")
+    @Column(name = "user_id", columnDefinition = "uuid")
     private UUID userId;
 }

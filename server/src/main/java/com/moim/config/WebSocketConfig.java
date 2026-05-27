@@ -21,9 +21,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
+        // SockJS 폴백 엔드포인트 (레거시 호환용)
         registry.addEndpoint("/ws/chat")
-            .setAllowedOrigins(frontUrl)  // SecurityConfig CORS와 동일한 Origin 적용
+            .setAllowedOrigins(frontUrl)
             .withSockJS();
+        // 네이티브 WebSocket 엔드포인트 (프론트 Vite 프록시 경유)
+        registry.addEndpoint("/ws/native")
+            .setAllowedOrigins(frontUrl);
     }
 
     @Override
