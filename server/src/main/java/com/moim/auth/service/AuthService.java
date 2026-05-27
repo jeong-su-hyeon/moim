@@ -3,6 +3,7 @@ package com.moim.auth.service;
 import com.moim.auth.dto.LoginRequest;
 import com.moim.auth.dto.SignupRequest;
 import com.moim.auth.dto.TokenResponse;
+import com.moim.domain.user.dto.UserResponse;
 import com.moim.auth.entity.RefreshToken;
 import com.moim.auth.jwt.JwtProperties;
 import com.moim.auth.jwt.JwtProvider;
@@ -106,6 +107,6 @@ public class AuthService {
             .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
-        return new TokenResponse(accessToken);
+        return new TokenResponse(accessToken, UserResponse.from(user));
     }
 }

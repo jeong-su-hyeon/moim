@@ -1,0 +1,154 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow: auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 32px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.logo {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.userName {
+  font-size: 14px;
+  color: #555;
+}
+
+.btn {
+  padding: 6px 16px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  background: #fff;
+}
+
+.btn:hover {
+  background: #f5f5f5;
+}
+
+.btnPrimary {
+  background: #1a73e8;
+  color: #fff;
+  border-color: #1a73e8;
+}
+
+.btnPrimary:hover {
+  background: #1558b0;
+}
+
+/* 메인 */
+.main {
+  flex: 1;
+  padding: 40px 32px;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.hero {
+  text-align: center;
+  padding: 48px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.hero h2 {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.hero p {
+  font-size: 15px;
+  color: #666;
+}
+
+.ctaBtn {
+  margin-top: 8px;
+  padding: 12px 32px;
+  background: #1a73e8;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ctaBtn:hover {
+  background: #1558b0;
+}
+
+/* 방 목록 */
+.roomSection {
+  border-top: 1px solid #eee;
+  padding-top: 32px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.sectionHeader h3 {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.newRoomLink {
+  font-size: 13px;
+  color: #1a73e8;
+}
+
+.empty {
+  color: #aaa;
+  font-size: 14px;
+}
+
+.roomList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.roomCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  transition: background 0.1s;
+}
+
+.roomCard:hover {
+  background: #f5f5f5;
+}
+
+.roomTitle {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.roomMeta {
+  font-size: 12px;
+  color: #888;
+}

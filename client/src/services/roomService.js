@@ -1,0 +1,16 @@
+import api from './api.js';
+
+/**
+ * @typedef {{ id: string, title: string, hostId: string, status: string, participants: UserInfo[] }} Room
+ */
+
+export const createRoom = (title) => api.post('/rooms', { title });
+
+export const getRoom = (roomId) => api.get(`/rooms/${roomId}`);
+
+export const joinRoom = (roomId) => api.post(`/rooms/${roomId}/join`);
+
+export const deleteRoom = (roomId) => api.delete(`/rooms/${roomId}`);
+
+export const confirmRoom = (roomId, confirmedDate, confirmedPlaceId) =>
+  api.post(`/rooms/${roomId}/confirm`, { confirmedDate, confirmedPlaceId });
