@@ -4,7 +4,6 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   define: {
-    // sockjs-client 등 CJS 모듈이 참조하는 Node.js global 폴리필
     global: "globalThis",
   },
   server: {
@@ -12,7 +11,7 @@ export default defineConfig({
     host: true,
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        target: "http://192.168.0.13:8000",
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on("proxyReq", (proxyReq) => {
@@ -21,7 +20,7 @@ export default defineConfig({
         },
       },
       "/ws": {
-        target: "http://localhost:8000",
+        target: "http://192.168.0.13:8000",
         ws: true,
         changeOrigin: true,
         configure: (proxy) => {
