@@ -48,7 +48,7 @@ export default function Home() {
     <div className={styles.page}>
       {/* 헤더 */}
       <header className={styles.header}>
-        <h1 className={styles.logo}>모임</h1>
+        <h1 className={styles.logo}>mo!m</h1>
         <div className={styles.headerRight}>
           {isAuthenticated ? (
             <>

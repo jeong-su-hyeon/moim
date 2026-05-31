@@ -81,14 +81,13 @@ moim/
 ## 환경 변수 (`.env`)
 
 ```
-VITE_API_BASE_URL=http://localhost:8080/api
-VITE_WS_URL=ws://localhost:8080/ws
 VITE_NAVER_MAP_CLIENT_ID=your_naver_client_id
 VITE_GOOGLE_CLIENT_ID=your_google_client_id
 VITE_KAKAO_REST_API_KEY=your_kakao_key
 ```
 
-`.env`는 절대 커밋하지 않는다. `.env.example`에 키 이름만 기재.
+- `VITE_API_BASE_URL`, `VITE_WS_URL`은 `.env`에 넣지 않는다. 개발 환경에서는 Vite 프록시(`/api → localhost:8000`)가 대신 처리하므로 없어야 프록시가 동작한다. 있으면 직접 호출로 빠져 CORS 오류 발생.
+- `.env`는 절대 커밋하지 않는다. `.env.example`에 키 이름만 기재.
 
 ---
 
@@ -106,7 +105,9 @@ VITE_KAKAO_REST_API_KEY=your_kakao_key
 ```
 
 `/room/:roomId`는 로그인 여부와 무관하게 링크 진입 허용 (비회원도 초대 링크 접근 가능).
-비회원은 로그인 유도 모달 표시 후 저장된 `roomId`로 자동 리다이렉트.
+- 비로그인 → `/login?redirect=/room/{roomId}` 로 이동
+- 로그인 했지만 비참여자 → 참가 확인 화면 표시 (방 제목, 인원, 참가하기 버튼)
+- 참여자 → 캘린더 화면 진입
 
 ---
 
@@ -114,17 +115,20 @@ VITE_KAKAO_REST_API_KEY=your_kakao_key
 
 ### `useAuthStore`
 - `user`, `accessToken`, `isAuthenticated`
-- `login()`, `logout()`, `refreshToken()`
-- `persist` 미들웨어로 `localStorage`에 토큰 유지
+- `login()`, `logout()`, `setAccessToken()`
+- `persist` 미들웨어로 `sessionStorage`에 저장 (탭 닫으면 삭제, 새로고침엔 유지)
+- `accessToken`도 sessionStorage에 포함 — 새로고침 시 재로그인 불필요
 
 ### `useRoomStore`
 - `room` (id, title, hostId, participants[])
 - `maxParticipants = 10` 검증은 백엔드 책임; 프론트는 UI 비활성화로 추가 안내만
 
 ### `useScheduleStore`
-- `myDates` (내가 선택한 날짜 배열)
-- `aggregated` (참여자별 가능 날짜 집계 결과)
+- `myDatesByRoom` (`{ [roomId]: string[] }`) — 방별로 독립 관리, 다른 방 날짜가 섞이지 않음
+- `aggregated` (`{ "2026-06-01": 3, ... }`) — 서버에서 받은 집계 결과 (객체, 배열 아님)
 - `confirmedDate` (확정된 날짜)
+- `getMyDates(roomId)` — 특정 방의 내 선택 날짜 반환
+- `toggleDate(roomId, date)` — roomId 범위 안에서 토글
 
 ### `useLocationStore`
 - `myOrigin` (내 출발지 좌표)
@@ -152,10 +156,14 @@ VITE_KAKAO_REST_API_KEY=your_kakao_key
 
 ## Naver Maps 연동 주의사항
 
-1. **CDN 로드:** `index.html`의 `<script>` 태그로 로드. `window.naver.maps`가 준비된 뒤 컴포넌트 마운트 필요.
-2. **CORS:** Naver Directions API (길찾기)는 클라이언트에서 직접 호출 시 CORS 차단. **반드시 Spring Boot 서버를 통해 프록시.**  클라이언트 ID를 브라우저에 노출하지 않는다.
-3. **지도 정리:** `useNaverMap` 훅의 cleanup 함수에서 `map.destroy()` 호출. 미호출 시 메모리 누수.
-4. **마커 제거:** 후보지 삭제 시 `marker.setMap(null)` 명시적 호출 필요.
+1. **CDN 로드:** `index.html`의 `<script>` 태그로 로드. `ncpKeyId=%VITE_NAVER_MAP_CLIENT_ID%&submodules=geocoder` 형식. Vite가 빌드 시 env 값 치환.
+2. **도메인 등록 필수:** NCP 콘솔 → AI·NAVER API → Maps → 애플리케이션에서 `http://localhost:3000` 등록해야 지도가 표시됨.
+3. **지도 준비 대기:** `useNaverMap` 훅은 `window.naver?.maps` 폴링(200ms 간격)으로 로드 완료를 기다린 뒤 초기화. `mapReady` 상태로 외부에 노출.
+4. **지도 클릭 → 리버스 지오코딩:** 클릭 좌표를 `naver.maps.Service.reverseGeocode`로 주소 변환 후 `onMapClick(lat, lng, address)` 콜백 호출.
+5. **장소 검색:** `GET /api/rooms/{roomId}/places/search?query=...` → 서버가 Naver Geocoding API(`maps.apigw.ntruss.com/map-geocode/v2/geocode`) 프록시. Geocoding API는 NCP 콘솔에서 별도 활성화 필요.
+6. **CORS:** Directions·Geocoding API는 클라이언트 직접 호출 시 CORS 차단. 반드시 Spring Boot 서버를 통해 프록시.
+7. **지도 정리:** `useNaverMap` 훅의 cleanup 함수에서 `map.destroy()` 호출. 미호출 시 메모리 누수.
+8. **마커 제거:** 후보지 삭제 시 `marker.setMap(null)` 명시적 호출 필요.
 
 ---
 
@@ -204,6 +212,13 @@ VITE_KAKAO_REST_API_KEY=your_kakao_key
 | 내 방 목록 | `GET /api/rooms` — 참여자 테이블 기준 조회 (내가 만든 방 + 초대받은 방 모두 포함), 최신순 |
 | WebSocket 연결 위치 | `RoomLayout`에서 한 번만 `useWebSocket` 호출. ChatPanel은 `sendMessage` prop으로 수신 |
 | 채팅 커서 페이지네이션 | `cursor = null` 이면 최신 N개, `cursor = sentAt(LocalDateTime)` 이면 그 이전 N개. 쿼리를 두 개로 분리해 PostgreSQL 타입 추론 오류 방지 |
+| 캘린더 날짜 비활성화 | 오늘 포함 이후 날짜만 선택 가능. `dateStr < todayStr` 조건으로 어제까지 비활성화 |
+| 날짜 선택 범위 | `myDatesByRoom[roomId]`로 방별 독립 관리. 방 전환 시 다른 방 날짜가 출력되는 문제 방지 |
+| 최종 약속 탭 | `aggregated` 데이터로 최다 선택 날짜 자동 계산. 동률 시 해당 날짜 전부 표시 |
+| 초대 링크 | 방 네비게이션 🔗 버튼으로 `window.location.origin/room/{roomId}` 클립보드 복사 |
+| 방 참가 흐름 | 비참여자가 `/room/{roomId}` 진입 시 참가 확인 카드 표시 → 참가하기 버튼 → `POST /join` |
+| 홈 초대 참가 | 홈 화면에서 초대 링크 또는 UUID 직접 입력해 방 접속 가능 |
+| dateUtils | `toDateString`은 `getFullYear/getMonth/getDate` 로컬 기준 사용. `toISOString()`은 UTC 기준이라 한국 시간대에서 날짜 오차 발생 가능 |
 
 ---
 
@@ -272,7 +287,8 @@ src/main/java/com/moim/
 └── infra/
     └── naver/
         ├── NaverDirectionsClient.java      # Naver Directions API HTTP 호출 (서버사이드)
-        └── NaverDirectionsResponse.java
+        ├── NaverDirectionsResponse.java
+        └── NaverPlacesClient.java          # Naver Geocoding API 장소 검색 프록시
 ```
 
 ---
@@ -379,8 +395,10 @@ GET    /api/rooms/{roomId}/schedules       # 전체 참여자 날짜 집계 응�
 # 장소
 POST   /api/rooms/{roomId}/origins         # 내 출발지 저장
 GET    /api/rooms/{roomId}/origins         # 전체 출발지 조회
+GET    /api/rooms/{roomId}/places          # 후보지 목록 조회 ★ 추가
 POST   /api/rooms/{roomId}/places          # 후보지 등록
 DELETE /api/rooms/{roomId}/places/{placeId}
+GET    /api/rooms/{roomId}/places/search?query=  # 장소 검색 (Naver Geocoding 프록시) ★ 추가
 GET    /api/rooms/{roomId}/places/{placeId}/travel-times?transport=TRANSIT
        # Naver Directions 프록시 → TravelTime 캐시 우선 조회
 
@@ -525,12 +543,13 @@ jwt:
 
 naver:
   directions:
-    client-id: ${NAVER_CLIENT_ID}
-    client-secret: ${NAVER_CLIENT_SECRET}
+    client-id: ${NAVER_CLIENT_ID}        # NCP Access Key ID (Directions + Geocoding 공용)
+    client-secret: ${NAVER_CLIENT_SECRET} # NCP Secret Key
     base-url: https://naveropenapi.apigw.ntruss.com
+                                         # Geocoding은 maps.apigw.ntruss.com 사용 (NaverPlacesClient)
 
 app:
-  front-url: ${FRONT_URL}               # 프론트 Origin (CORS + OAuth 리다이렉트)
+  front-url: ${FRONT_URL:http://localhost:3000}  # 프론트 Origin (CORS + OAuth 리다이렉트)
 ```
 
 ---
