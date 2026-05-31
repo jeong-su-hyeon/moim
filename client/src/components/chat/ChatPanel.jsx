@@ -1,15 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import useChatStore from '../../stores/useChatStore.js';
 import useAuthStore from '../../stores/useAuthStore.js';
-import useWebSocket from '../../hooks/useWebSocket.js';
 import styles from './ChatPanel.module.css';
 
-export default function ChatPanel({ roomId }) {
+export default function ChatPanel({ roomId, sendMessage }) {
   const [input, setInput] = useState('');
   const bottomRef = useRef(null);
   const { messages, isConnected } = useChatStore();
   const user = useAuthStore((s) => s.user);
-  const { sendMessage } = useWebSocket(roomId);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });

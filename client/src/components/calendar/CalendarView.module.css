@@ -90,6 +90,16 @@
   background: #e8f0fe;
 }
 
+.cellPast {
+  opacity: 0.35;
+  cursor: not-allowed;
+  background: #fafafa;
+}
+
+.cellPast:hover {
+  background: #fafafa;
+}
+
 .dayNum {
   font-size: 14px;
 }

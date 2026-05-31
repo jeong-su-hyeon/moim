@@ -37,7 +37,7 @@ export default function useRoom(roomId) {
 
       // 부차적 데이터 — 실패해도 방 화면은 계속 표시
       getAggregatedSchedules(roomId)
-        .then((r) => setAggregated(r.data.data ?? []))
+        .then((r) => setAggregated(r.data.data ?? {}))
         .catch(() => {});
 
       getMessages(roomId)

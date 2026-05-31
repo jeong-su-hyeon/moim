@@ -1,20 +1,29 @@
 import { create } from 'zustand';
 
-const useScheduleStore = create((set) => ({
-  myDates: [],
-  aggregated: [],
+const useScheduleStore = create((set, get) => ({
+  // roomId별 선택 날짜 관리 { [roomId]: string[] }
+  myDatesByRoom: {},
+  aggregated: {},
   confirmedDate: null,
 
-  setMyDates: (dates) => set({ myDates: dates }),
-  toggleDate: (date) =>
-    set((state) => ({
-      myDates: state.myDates.includes(date)
-        ? state.myDates.filter((d) => d !== date)
-        : [...state.myDates, date],
-    })),
+  getMyDates: (roomId) => get().myDatesByRoom[roomId] ?? [],
+
+  toggleDate: (roomId, date) =>
+    set((state) => {
+      const prev = state.myDatesByRoom[roomId] ?? [];
+      const next = prev.includes(date)
+        ? prev.filter((d) => d !== date)
+        : [...prev, date];
+      return { myDatesByRoom: { ...state.myDatesByRoom, [roomId]: next } };
+    }),
+
   setAggregated: (aggregated) => set({ aggregated }),
   setConfirmedDate: (date) => set({ confirmedDate: date }),
-  clear: () => set({ myDates: [], aggregated: [], confirmedDate: null }),
+  clearRoom: (roomId) =>
+    set((state) => {
+      const { [roomId]: _, ...rest } = state.myDatesByRoom;
+      return { myDatesByRoom: rest, aggregated: {}, confirmedDate: null };
+    }),
 }));
 
 export default useScheduleStore;
