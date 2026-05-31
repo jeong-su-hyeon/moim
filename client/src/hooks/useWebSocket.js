@@ -7,11 +7,14 @@ import useAuthStore from "../stores/useAuthStore.js";
  * STOMP over native WebSocket 연결 훅 (SockJS 미사용)
  * 개발 환경에서는 Vite 프록시(/ws → localhost:8000)를 경유
  * @param {string} roomId
+ * @param {{ onScheduleUpdate?: (aggregated: Object) => void }} options
  */
-export default function useWebSocket(roomId) {
+export default function useWebSocket(roomId, { onScheduleUpdate } = {}) {
   const clientRef = useRef(null);
   const { addMessage, setConnected } = useChatStore();
   const accessToken = useAuthStore((s) => s.accessToken);
+  const onScheduleUpdateRef = useRef(onScheduleUpdate);
+  useEffect(() => { onScheduleUpdateRef.current = onScheduleUpdate; }, [onScheduleUpdate]);
 
   useEffect(() => {
     if (!roomId || !accessToken) return;
@@ -25,9 +28,18 @@ export default function useWebSocket(roomId) {
       reconnectDelay: 5000,
       onConnect: () => {
         setConnected(true);
+        // 채팅 메시지 구독
         client.subscribe(`/topic/room/${roomId}`, (frame) => {
           try {
             addMessage(JSON.parse(frame.body));
+          } catch {
+            // 잘못된 메시지 무시
+          }
+        });
+        // 일정 변경 구독
+        client.subscribe(`/topic/room/${roomId}/schedule`, (frame) => {
+          try {
+            onScheduleUpdateRef.current?.(JSON.parse(frame.body));
           } catch {
             // 잘못된 메시지 무시
           }

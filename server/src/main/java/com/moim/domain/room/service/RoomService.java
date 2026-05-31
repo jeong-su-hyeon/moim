@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -42,6 +43,14 @@ public class RoomService {
             .build());
 
         return RoomResponse.from(room);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RoomResponse> getMyRooms(User user) {
+        return roomRepository.findAllByParticipantUserId(user.getId())
+            .stream()
+            .map(RoomResponse::from)
+            .toList();
     }
 
     @Transactional(readOnly = true)

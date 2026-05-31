@@ -12,11 +12,16 @@ import java.util.UUID;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> {
 
-    // cursor 기반 페이지네이션: sentAt 기준으로 이전 메시지 조회
-    @Query("SELECT m FROM ChatMessage m WHERE m.room.id = :roomId " +
-           "AND (:cursor IS NULL OR m.sentAt < :cursor) " +
-           "ORDER BY m.sentAt DESC")
-    List<ChatMessage> findByRoomWithCursor(
+    // cursor 없을 때 (첫 페이지)
+    @Query("SELECT m FROM ChatMessage m WHERE m.room.id = :roomId ORDER BY m.sentAt DESC")
+    List<ChatMessage> findByRoomLatest(
+        @Param("roomId") UUID roomId,
+        Pageable pageable
+    );
+
+    // cursor 있을 때 (이전 메시지)
+    @Query("SELECT m FROM ChatMessage m WHERE m.room.id = :roomId AND m.sentAt < :cursor ORDER BY m.sentAt DESC")
+    List<ChatMessage> findByRoomBeforeCursor(
         @Param("roomId") UUID roomId,
         @Param("cursor") LocalDateTime cursor,
         Pageable pageable

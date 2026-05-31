@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -21,6 +22,12 @@ import java.util.UUID;
 public class RoomController {
 
     private final RoomService roomService;
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<RoomResponse>>> getMyRooms(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.ok(roomService.getMyRooms(user)));
+    }
 
     @PostMapping
     public ResponseEntity<ApiResponse<RoomResponse>> createRoom(

@@ -1,20 +1,41 @@
 import { useState } from 'react';
 import useScheduleStore from '../../stores/useScheduleStore.js';
 import useRoomStore from '../../stores/useRoomStore.js';
+import { saveMyDates } from '../../services/scheduleService.js';
+import Toast from '../common/Toast.jsx';
 import { toDateString, firstDayOf, lastDayOf, WEEKDAYS } from '../../utils/dateUtils.js';
 import styles from './CalendarView.module.css';
 
 export default function CalendarView({ roomId }) {
   const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth()); // 0-indexed
+  const todayStr = toDateString(today);
 
-  const { myDates, aggregated, toggleDate } = useScheduleStore();
+  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth());
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const { getMyDates, toggleDate, aggregated } = useScheduleStore();
   const { participants } = useRoomStore();
+
+  const myDates = getMyDates(roomId);
+
+  const handleSave = async () => {
+    if (myDates.length === 0) return;
+    setSaving(true);
+    try {
+      await saveMyDates(roomId, myDates);
+      setToast('일정이 저장되었습니다.');
+    } catch {
+      setToast('저장에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const firstDay = firstDayOf(year, month);
   const totalDays = lastDayOf(year, month);
-  const startWeekday = firstDay.getDay(); // 0=일
+  const startWeekday = firstDay.getDay();
 
   const prevMonth = () => {
     if (month === 0) { setYear(y => y - 1); setMonth(11); }
@@ -25,11 +46,9 @@ export default function CalendarView({ roomId }) {
     else setMonth(m => m + 1);
   };
 
-  /* 날짜별 가능 인원 수 맵 */
-  const countMap = {};
-  (aggregated ?? []).forEach(({ availableDate, count }) => {
-    countMap[availableDate] = count;
-  });
+  const countMap = aggregated && typeof aggregated === 'object' && !Array.isArray(aggregated)
+    ? aggregated
+    : {};
 
   const cells = [];
   for (let i = 0; i < startWeekday; i++) cells.push(null);
@@ -37,14 +56,12 @@ export default function CalendarView({ roomId }) {
 
   return (
     <div className={styles.wrap}>
-      {/* 헤더 */}
       <div className={styles.header}>
         <button className={styles.navBtn} onClick={prevMonth}>{'<'}</button>
         <span className={styles.monthLabel}>{year}년 {month + 1}월</span>
         <button className={styles.navBtn} onClick={nextMonth}>{'>'}</button>
       </div>
 
-      {/* 참여자 범례 */}
       {participants.length > 0 && (
         <div className={styles.legend}>
           {participants.map((p) => (
@@ -56,16 +73,15 @@ export default function CalendarView({ roomId }) {
         </div>
       )}
 
-      {/* 요일 행 */}
       <div className={styles.grid}>
         {WEEKDAYS.map((w) => (
           <div key={w} className={styles.weekday}>{w}</div>
         ))}
 
-        {/* 날짜 셀 */}
         {cells.map((day, idx) => {
           if (!day) return <div key={`empty-${idx}`} />;
           const dateStr = toDateString(new Date(year, month, day));
+          const isPast = dateStr < todayStr; // 오늘 미포함, 어제까지 비활성화
           const isSelected = myDates.includes(dateStr);
           const count = countMap[dateStr] ?? 0;
           const total = participants.length || 1;
@@ -74,11 +90,16 @@ export default function CalendarView({ roomId }) {
           return (
             <button
               key={dateStr}
-              className={`${styles.cell} ${isSelected ? styles.cellSelected : ''}`}
-              onClick={() => toggleDate(dateStr)}
+              className={[
+                styles.cell,
+                isSelected ? styles.cellSelected : '',
+                isPast ? styles.cellPast : '',
+              ].join(' ')}
+              onClick={() => !isPast && toggleDate(roomId, dateStr)}
+              disabled={isPast}
             >
               <span className={styles.dayNum}>{day}</span>
-              {count > 0 && (
+              {count > 0 && !isPast && (
                 <span className={styles.countBadge} style={{ opacity: 0.4 + ratio * 0.6 }}>
                   {count}명
                 </span>
@@ -88,15 +109,18 @@ export default function CalendarView({ roomId }) {
         })}
       </div>
 
-      {/* 내 날짜 저장 버튼 */}
       <div className={styles.footer}>
-        <span className={styles.selectedInfo}>
-          {myDates.length}일 선택됨
-        </span>
-        <button className={styles.saveBtn} onClick={() => alert('저장 기능은 서버 연동 후 동작합니다.')}>
-          저장
+        <span className={styles.selectedInfo}>{myDates.length}일 선택됨</span>
+        <button
+          className={styles.saveBtn}
+          onClick={handleSave}
+          disabled={saving || myDates.length === 0}
+        >
+          {saving ? '저장 중...' : '저장'}
         </button>
       </div>
+
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>
   );
 }

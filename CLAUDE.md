@@ -34,11 +34,11 @@ moim/
 ├── src/
 │   ├── assets/              # 정적 이미지, SVG 아이콘
 │   ├── components/
-│   │   ├── common/          # Button, Modal, Input, Avatar 등 공통 UI
+│   │   ├── common/          # 공통 UI (Toast 등)
 │   │   ├── calendar/        # 날짜 선택 캘린더 컴포넌트
 │   │   ├── map/             # Naver 지도 래퍼, 마커, 장소 검색
 │   │   ├── chat/            # 채팅창, 메시지 버블, 입력창
-│   │   └── room/            # 방 헤더, 참여자 목록, 초대 링크 복사
+│   │   └── room/            # RoomLayout (WebSocket 연결 진입점), 네비게이션
 │   ├── pages/
 │   │   ├── Home/            # 랜딩 / 내 약속 목록
 │   │   ├── Auth/            # Login, Signup, OAuth 콜백
@@ -159,13 +159,22 @@ VITE_KAKAO_REST_API_KEY=your_kakao_key
 
 ---
 
-## 실시간 채팅 (STOMP/WebSocket)
+## 실시간 통신 (STOMP/WebSocket)
 
-- 연결 엔드포인트: `VITE_WS_URL + /chat`
-- 구독 경로: `/topic/room/{roomId}`
-- 발행 경로: `/app/room/{roomId}/message`
-- `useWebSocket` 훅이 방 진입 시 연결, 퇴장/언마운트 시 `client.deactivate()`.
-- 재연결 로직: STOMP `reconnectDelay` 옵션 활용 (백오프).
+- 연결 엔드포인트: `ws://host/ws/native` (native WebSocket, Vite 프록시 경유)
+- `useWebSocket` 훅은 `RoomLayout`에서 **한 번만** 호출하고 `sendMessage`를 ChatPanel에 prop으로 전달
+  - ChatPanel이 직접 훅을 호출하면 WebSocket 연결이 중복 생성되므로 금지
+- 재연결 로직: STOMP `reconnectDelay: 5000` (5초 백오프)
+
+### 채팅
+- 구독: `/topic/room/{roomId}` → `useChatStore.addMessage()`
+- 발행: `/app/room/{roomId}/message`
+
+### 일정 변경 실시간 반영
+- 구독: `/topic/room/{roomId}/schedule` → `useScheduleStore.setAggregated()`
+- 서버에서 `POST /api/rooms/{roomId}/schedules` 처리 후 `SimpMessagingTemplate`으로 브로드캐스트
+- 덕분에 한 참여자가 날짜를 저장하면 같은 방의 모든 참여자 달력에 즉시 반영됨
+- `useWebSocket(roomId, { onScheduleUpdate })` 형태로 콜백 주입
 
 ---
 
@@ -191,6 +200,10 @@ VITE_KAKAO_REST_API_KEY=your_kakao_key
 | 약속방 자동 파기 | 백엔드 스케줄러 처리. 프론트는 만료 방 접근 시 404 화면 표시 |
 | 출발지 정확도 | 대략적 위치(동네 수준) 또는 정확한 주소 선택 허용 |
 | 채팅 UI 참고 | Discord 스타일: 우측 멤버 패널, 날짜별 구분선, 읽지않은 메시지 배지 |
+| 일정 저장 | 덮어쓰기 방식 (DELETE + INSERT). 저장 완료 후 `/topic/room/{roomId}/schedule`로 집계 브로드캐스트 |
+| 내 방 목록 | `GET /api/rooms` — 참여자 테이블 기준 조회 (내가 만든 방 + 초대받은 방 모두 포함), 최신순 |
+| WebSocket 연결 위치 | `RoomLayout`에서 한 번만 `useWebSocket` 호출. ChatPanel은 `sendMessage` prop으로 수신 |
+| 채팅 커서 페이지네이션 | `cursor = null` 이면 최신 N개, `cursor = sentAt(LocalDateTime)` 이면 그 이전 N개. 쿼리를 두 개로 분리해 PostgreSQL 타입 추론 오류 방지 |
 
 ---
 
@@ -352,6 +365,7 @@ GET    /api/auth/callback/google           # OAuth 콜백 → 프론트로 ?toke
 GET    /api/auth/callback/kakao
 
 # 약속방
+GET    /api/rooms                          # 내가 참여 중인 방 목록 (최신순, 인증 필요) ★ 추가
 POST   /api/rooms                          # 방 생성
 GET    /api/rooms/{roomId}                 # 방 상세 (참여자 목록 포함)
 POST   /api/rooms/{roomId}/join            # 초대 링크로 방 참가 (10명 초과 시 409)
@@ -359,8 +373,8 @@ DELETE /api/rooms/{roomId}                 # 방 삭제·파토 (host only)
 POST   /api/rooms/{roomId}/confirm         # 날짜+장소 확정 (host only)
 
 # 일정
-POST   /api/rooms/{roomId}/schedules       # 내 가능 날짜 저장 (배열, 덮어쓰기)
-GET    /api/rooms/{roomId}/schedules       # 전체 참여자 날짜 집계 응답
+POST   /api/rooms/{roomId}/schedules       # 내 가능 날짜 저장 (배열, 덮어쓰기) → 저장 후 WebSocket 브로드캐스트
+GET    /api/rooms/{roomId}/schedules       # 전체 참여자 날짜 집계 응답 { "2026-06-01": 3, ... }
 
 # 장소
 POST   /api/rooms/{roomId}/origins         # 내 출발지 저장
@@ -371,7 +385,8 @@ GET    /api/rooms/{roomId}/places/{placeId}/travel-times?transport=TRANSIT
        # Naver Directions 프록시 → TravelTime 캐시 우선 조회
 
 # 채팅 히스토리 (REST)
-GET    /api/rooms/{roomId}/messages?cursor={lastId}&size=50
+GET    /api/rooms/{roomId}/messages?cursor={sentAt}&size=50
+       # cursor: LocalDateTime 문자열. 없으면 최신 50개, 있으면 해당 시각 이전 50개
 
 # 결과
 GET    /api/rooms/{roomId}/result          # 확정 날짜·장소·시간 요약
@@ -386,9 +401,16 @@ GET    /api/rooms/{roomId}/time-votes
 ### WebSocket (STOMP)
 
 ```
-연결: ws://host/ws/chat          (SockJS fallback 포함)
-구독: /topic/room/{roomId}       (채팅 메시지 수신)
-발행: /app/room/{roomId}/message (채팅 메시지 전송)
+연결: ws://host/ws/native        (native WebSocket, SockJS 미사용)
+      ws://host/ws/chat          (SockJS fallback, 레거시 호환)
+
+# 채팅
+구독: /topic/room/{roomId}              → ChatMessage JSON 수신
+발행: /app/room/{roomId}/message        → { content: string }
+
+# 일정 변경 실시간 반영 ★ 추가
+구독: /topic/room/{roomId}/schedule     → { "2026-06-01": 3, ... } (집계 결과 전체)
+     POST /schedules 저장 완료 시 서버가 SimpMessagingTemplate으로 자동 브로드캐스트
 ```
 
 STOMP CONNECT 시 `Authorization: Bearer {token}` 헤더 전달.

@@ -24,6 +24,23 @@
   margin-bottom: 8px;
 }
 
+.copyBtn {
+  margin-top: 6px;
+  font-size: 16px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: #666;
+  transition: background 0.15s;
+}
+
+.copyBtn:hover {
+  background: #e8f0fe;
+}
+
 .navTitleText {
   font-size: 11px;
   font-weight: 600;
@@ -76,9 +93,141 @@
   line-height: 1.3;
 }
 
+.homeBtn {
+  margin-top: auto;
+  margin-bottom: 12px;
+  font-size: 20px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #666;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.homeBtn:hover {
+  background: #efefef;
+}
+
 /* ── 메인 콘텐츠 ── */
 .main {
   flex: 1;
   min-width: 0;
   overflow: auto;
+}
+
+/* ── 최종 약속 탭 ── */
+.resultWrap {
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.resultTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111;
+}
+
+.resultEmpty {
+  color: #aaa;
+  font-size: 14px;
+}
+
+.resultBest {
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  border-radius: 10px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.resultTie {
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  border-radius: 10px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.resultBestLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #555;
+}
+
+.resultBestDate {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1b5e20;
+  margin: 0;
+}
+
+.resultBestCount {
+  font-size: 13px;
+  color: #388e3c;
+  margin: 0;
+}
+
+.resultTieList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.resultTieItem {
+  font-size: 16px;
+  font-weight: 600;
+  color: #5d4037;
+  padding: 6px 0;
+  border-bottom: 1px dashed #ffe082;
+}
+
+.resultTieItem:last-child {
+  border-bottom: none;
+}
+
+.resultAllWrap {
+  border-top: 1px solid #eee;
+  padding-top: 8px;
+}
+
+.resultAllTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #888;
+  margin-bottom: 10px;
+}
+
+.resultAllList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.resultAllItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fafafa;
+}
+
+.resultAllCount {
+  font-weight: 600;
+  color: #1a73e8;
 }

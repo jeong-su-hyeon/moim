@@ -47,9 +47,10 @@ public class ChatService {
     @Transactional(readOnly = true)
     public List<ChatMessageResponse> getHistory(UUID roomId, LocalDateTime cursor, int size, UUID userId) {
         roomService.validateParticipant(roomId, userId);
-        return chatMessageRepository
-            .findByRoomWithCursor(roomId, cursor, PageRequest.of(0, size))
-            .stream()
+        List<ChatMessage> messages = cursor == null
+            ? chatMessageRepository.findByRoomLatest(roomId, PageRequest.of(0, size))
+            : chatMessageRepository.findByRoomBeforeCursor(roomId, cursor, PageRequest.of(0, size));
+        return messages.stream()
             .map(ChatMessageResponse::from)
             .toList();
     }

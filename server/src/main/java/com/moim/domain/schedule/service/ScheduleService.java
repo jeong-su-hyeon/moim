@@ -10,6 +10,7 @@ import com.moim.domain.user.entity.User;
 import com.moim.global.exception.BusinessException;
 import com.moim.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,7 @@ public class ScheduleService {
     private final ScheduleRepository scheduleRepository;
     private final RoomRepository roomRepository;
     private final RoomService roomService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
     public void saveSchedule(UUID roomId, ScheduleRequest request, User user) {
@@ -42,6 +44,10 @@ public class ScheduleService {
             .toList();
 
         scheduleRepository.saveAll(schedules);
+
+        // 집계 결과를 방 참여자 전원에게 브로드캐스트
+        Map<LocalDate, Long> aggregated = getAggregated(roomId, user);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/schedule", aggregated);
     }
 
     @Transactional(readOnly = true)
