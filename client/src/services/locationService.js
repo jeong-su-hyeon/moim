@@ -11,6 +11,11 @@ export const saveMyOrigin = (roomId, lat, lng, label) =>
 
 export const getOrigins = (roomId) => api.get(`/rooms/${roomId}/origins`);
 
+export const getPlaces = (roomId) => api.get(`/rooms/${roomId}/places`);
+
+export const searchPlaces = (roomId, query) =>
+  api.get(`/rooms/${roomId}/places/search`, { params: { query } });
+
 export const registerPlace = (roomId, name, address, lat, lng) =>
   api.post(`/rooms/${roomId}/places`, { name, address, lat, lng });
 

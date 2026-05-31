@@ -5,6 +5,7 @@ import com.moim.domain.location.entity.TransportMode;
 import com.moim.domain.location.service.LocationService;
 import com.moim.domain.user.entity.User;
 import com.moim.global.response.ApiResponse;
+import com.moim.infra.naver.NaverPlacesClient;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,16 @@ import java.util.UUID;
 public class LocationController {
 
     private final LocationService locationService;
+    private final NaverPlacesClient naverPlacesClient;
+
+    // 장소 검색 프록시 (Naver Places API — CORS 우회)
+    @GetMapping("/places/search")
+    public ResponseEntity<ApiResponse<List<NaverPlacesClient.PlaceResult>>> searchPlaces(
+            @PathVariable UUID roomId,
+            @RequestParam String query,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.ok(naverPlacesClient.search(query)));
+    }
 
     @PostMapping("/origins")
     public ResponseEntity<ApiResponse<Void>> saveOrigin(
