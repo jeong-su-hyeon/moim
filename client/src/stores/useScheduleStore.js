@@ -17,6 +17,9 @@ const useScheduleStore = create((set, get) => ({
       return { myDatesByRoom: { ...state.myDatesByRoom, [roomId]: next } };
     }),
 
+  clearDates: (roomId) =>
+    set((state) => ({ myDatesByRoom: { ...state.myDatesByRoom, [roomId]: [] } })),
+
   setAggregated: (aggregated) => set({ aggregated }),
   setConfirmedDate: (date) => set({ confirmedDate: date }),
   clearRoom: (roomId) =>

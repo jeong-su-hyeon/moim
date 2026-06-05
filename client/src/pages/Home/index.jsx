@@ -6,7 +6,7 @@ import styles from './Home.module.css';
 
 const STATUS_LABEL = {
   ACTIVE: '진행 중',
-  CONFIRMED: '확정',
+  CONFIRMED: '확정 완료',
   CANCELLED: '취소',
 };
 
@@ -115,13 +115,19 @@ export default function Home() {
                       <div className={styles.roomCardLeft}>
                         <span className={styles.roomTitle}>{room.title}</span>
                         <span className={styles.roomMeta}>
-                          방장: {room.hostName} · {room.participantCount}명 참여
-                          {room.confirmedDate && ` · ${room.confirmedDate}`}
+                          {room.hostName} 외 {room.participantCount - 1}명
                         </span>
                       </div>
-                      <span className={`${styles.statusBadge} ${styles[`status_${room.status}`]}`}>
-                        {STATUS_LABEL[room.status] ?? room.status}
-                      </span>
+                      <div className={styles.roomCardRight}>
+                        <span className={`${styles.statusBadge} ${styles[`status_${room.status}`]}`}>
+                          {STATUS_LABEL[room.status] ?? room.status}
+                        </span>
+                        {room.confirmedDate && (
+                          <span className={styles.confirmedDateBadge}>
+                            📅 {room.confirmedDate}
+                          </span>
+                        )}
+                      </div>
                     </Link>
                   </li>
                 ))}

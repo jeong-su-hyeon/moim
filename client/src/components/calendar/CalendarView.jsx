@@ -15,7 +15,7 @@ export default function CalendarView({ roomId }) {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
-  const { getMyDates, toggleDate, aggregated } = useScheduleStore();
+  const { getMyDates, toggleDate, clearDates, aggregated } = useScheduleStore();
   const { participants } = useRoomStore();
 
   const myDates = getMyDates(roomId);
@@ -83,7 +83,8 @@ export default function CalendarView({ roomId }) {
           const dateStr = toDateString(new Date(year, month, day));
           const isPast = dateStr < todayStr; // 오늘 미포함, 어제까지 비활성화
           const isSelected = myDates.includes(dateStr);
-          const count = countMap[dateStr] ?? 0;
+          const names = countMap[dateStr] ?? [];
+          const count = Array.isArray(names) ? names.length : Number(names);
           const total = participants.length || 1;
           const ratio = count / total;
 
@@ -111,13 +112,22 @@ export default function CalendarView({ roomId }) {
 
       <div className={styles.footer}>
         <span className={styles.selectedInfo}>{myDates.length}일 선택됨</span>
-        <button
-          className={styles.saveBtn}
-          onClick={handleSave}
-          disabled={saving || myDates.length === 0}
-        >
-          {saving ? '저장 중...' : '저장'}
-        </button>
+        <div className={styles.footerBtns}>
+          <button
+            className={styles.clearBtn}
+            onClick={() => clearDates(roomId)}
+            disabled={myDates.length === 0}
+          >
+            전체 취소
+          </button>
+          <button
+            className={styles.saveBtn}
+            onClick={handleSave}
+            disabled={saving || myDates.length === 0}
+          >
+            {saving ? '저장 중...' : '저장'}
+          </button>
+        </div>
       </div>
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}

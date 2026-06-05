@@ -124,6 +124,30 @@
   color: #555;
 }
 
+.footerBtns {
+  display: flex;
+  gap: 8px;
+}
+
+.clearBtn {
+  padding: 6px 14px;
+  background: #fff;
+  color: #e53935;
+  border: 1px solid #e53935;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.clearBtn:hover:not(:disabled) {
+  background: #fdecea;
+}
+
+.clearBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .saveBtn {
   padding: 6px 20px;
   background: #1a73e8;

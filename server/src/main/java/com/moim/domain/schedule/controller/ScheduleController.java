@@ -11,6 +11,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -31,7 +32,7 @@ public class ScheduleController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Map<LocalDate, Long>>> getSchedules(
+    public ResponseEntity<ApiResponse<Map<LocalDate, List<String>>>> getSchedules(
             @PathVariable UUID roomId,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ApiResponse.ok(scheduleService.getAggregated(roomId, user)));
