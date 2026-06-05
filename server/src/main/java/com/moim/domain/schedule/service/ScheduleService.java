@@ -46,15 +46,18 @@ public class ScheduleService {
         scheduleRepository.saveAll(schedules);
 
         // 집계 결과를 방 참여자 전원에게 브로드캐스트
-        Map<LocalDate, Long> aggregated = getAggregated(roomId, user);
+        Map<LocalDate, List<String>> aggregated = getAggregated(roomId, user);
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/schedule", aggregated);
     }
 
     @Transactional(readOnly = true)
-    public Map<LocalDate, Long> getAggregated(UUID roomId, User user) {
+    public Map<LocalDate, List<String>> getAggregated(UUID roomId, User user) {
         roomService.validateParticipant(roomId, user.getId());
 
         return scheduleRepository.findByRoomId(roomId).stream()
-            .collect(Collectors.groupingBy(Schedule::getAvailableDate, Collectors.counting()));
+            .collect(Collectors.groupingBy(
+                Schedule::getAvailableDate,
+                Collectors.mapping(s -> s.getUser().getName(), Collectors.toList())
+            ));
     }
 }

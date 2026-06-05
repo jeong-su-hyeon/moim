@@ -11,7 +11,7 @@ export default defineConfig({
     host: true,
     proxy: {
       "/api": {
-        target: "http://192.168.0.13:8000",
+        target: "http://localhost:8000",
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on("proxyReq", (proxyReq) => {
@@ -20,7 +20,7 @@ export default defineConfig({
         },
       },
       "/ws": {
-        target: "http://192.168.0.13:8000",
+        target: "http://localhost:8000",
         ws: true,
         changeOrigin: true,
         configure: (proxy) => {

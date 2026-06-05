@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { TABS } from '../../constants/index.js';
 import CalendarView from '../calendar/CalendarView.jsx';
 import MapView from '../map/MapView.jsx';
@@ -8,6 +8,9 @@ import Toast from '../common/Toast.jsx';
 import useWebSocket from '../../hooks/useWebSocket.js';
 import useScheduleStore from '../../stores/useScheduleStore.js';
 import useRoomStore from '../../stores/useRoomStore.js';
+import useAuthStore from '../../stores/useAuthStore.js';
+import { getAggregatedSchedules } from '../../services/scheduleService.js';
+import { confirmRoom } from '../../services/roomService.js';
 import styles from './RoomLayout.module.css';
 
 const NAV_ITEMS = [
@@ -20,6 +23,15 @@ export default function RoomLayout({ room }) {
   const [activeTab, setActiveTab] = useState(TABS.DATE);
   const [copyToast, setCopyToast] = useState(null);
   const { setAggregated, aggregated } = useScheduleStore();
+
+  const handleTabChange = useCallback((tab) => {
+    setActiveTab(tab);
+    if (tab === TABS.RESULT) {
+      getAggregatedSchedules(room?.id)
+        .then((r) => setAggregated(r.data.data ?? {}))
+        .catch(() => {});
+    }
+  }, [room?.id, setAggregated]);
 
   const handleCopyLink = async () => {
     const url = `${window.location.origin}/room/${room?.id}`;
@@ -59,7 +71,7 @@ export default function RoomLayout({ room }) {
             <li key={tab}>
               <button
                 className={`${styles.navBtn} ${activeTab === tab ? styles.navBtnActive : ''}`}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => handleTabChange(tab)}
               >
                 <span className={styles.navIcon}>{icon}</span>
                 <span className={styles.navLabel}>{label}</span>
@@ -88,26 +100,50 @@ export default function RoomLayout({ room }) {
 
 function ResultView({ room, aggregated }) {
   const { participants } = useRoomStore();
+  const { user } = useAuthStore();
+  const isHost = room?.hostId === user?.id;
   const totalCount = participants.length || 0;
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [confirming, setConfirming] = useState(false);
+  const [toast, setToast] = useState(null);
+  const navigate = useNavigate();
 
-  // aggregated: { "2026-06-01": 3, "2026-06-07": 2, ... }
+  // aggregated: { "2026-06-01": ["김철수", "이영희"], ... }
   const entries = Object.entries(aggregated ?? {});
+  const getNames = (val) => (Array.isArray(val) ? val : []);
+  const getCount = (val) => getNames(val).length;
 
-  let topDates = [];
+  let topDate = null;
   let maxCount = 0;
 
   if (entries.length > 0) {
-    maxCount = Math.max(...entries.map(([, c]) => Number(c)));
-    topDates = entries
-      .filter(([, c]) => Number(c) === maxCount)
+    maxCount = Math.max(...entries.map(([, v]) => getCount(v)));
+    topDate = entries
+      .filter(([, v]) => getCount(v) === maxCount)
       .map(([date]) => date)
-      .sort();
+      .sort()[0];
   }
 
   const formatDate = (dateStr) => {
     const d = new Date(dateStr + 'T00:00:00');
     const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
     return `${dateStr} (${weekdays[d.getDay()]})`;
+  };
+
+  const sortedEntries = [...entries].sort(([, a], [, b]) => getCount(b) - getCount(a));
+
+  const handleConfirm = async () => {
+    if (!selectedDate) return;
+    setConfirming(true);
+    try {
+      await confirmRoom(room.id, selectedDate);
+      navigate(`/room/${room.id}/result`);
+    } catch (err) {
+      const code = err.response?.data?.error?.code;
+      if (code === 'FORBIDDEN') setToast('방장만 날짜를 확정할 수 있습니다.');
+      else setToast('확정에 실패했습니다. 다시 시도해주세요.');
+      setConfirming(false);
+    }
   };
 
   return (
@@ -118,46 +154,63 @@ function ResultView({ room, aggregated }) {
         <p className={styles.resultEmpty}>아직 일정을 입력한 참여자가 없습니다.</p>
       ) : (
         <>
-          {topDates.length === 1 ? (
-            <div className={styles.resultBest}>
+          {topDate && (
+            <div className={`${styles.resultBest} ${selectedDate === topDate ? styles.resultBestSelected : ''}`}>
               <span className={styles.resultBestLabel}>최다 선택 날짜</span>
-              <p className={styles.resultBestDate}>{formatDate(topDates[0])}</p>
+              <p className={styles.resultBestDate}>{formatDate(topDate)}</p>
               <p className={styles.resultBestCount}>
                 {totalCount > 0
                   ? `${totalCount}명 중 ${maxCount}명 가능`
                   : `${maxCount}명 가능`}
               </p>
-            </div>
-          ) : (
-            <div className={styles.resultTie}>
-              <span className={styles.resultBestLabel}>
-                동률 — {topDates.length}개 날짜 ({maxCount}명)
-              </span>
-              <ul className={styles.resultTieList}>
-                {topDates.map((date) => (
-                  <li key={date} className={styles.resultTieItem}>
-                    {formatDate(date)}
-                  </li>
-                ))}
-              </ul>
+              <p className={styles.resultNames}>{getNames(aggregated[topDate]).join(', ')}</p>
             </div>
           )}
 
           <div className={styles.resultAllWrap}>
             <p className={styles.resultAllTitle}>전체 날짜별 인원</p>
             <ul className={styles.resultAllList}>
-              {entries
-                .sort(([, a], [, b]) => Number(b) - Number(a))
-                .map(([date, count]) => (
-                  <li key={date} className={styles.resultAllItem}>
-                    <span>{formatDate(date)}</span>
-                    <span className={styles.resultAllCount}>{count}명</span>
-                  </li>
-                ))}
+              {sortedEntries.map(([date, val]) => {
+                const Row = isHost ? 'label' : 'div';
+                return (
+                <li key={date}>
+                  <Row
+                    className={`${styles.resultAllItem} ${isHost ? styles.resultAllItemClickable : ''} ${selectedDate === date ? styles.resultAllItemSelected : ''}`}
+                  >
+                    {isHost && (
+                      <input
+                        type="radio"
+                        name="confirmedDate"
+                        value={date}
+                        checked={selectedDate === date}
+                        onChange={() => setSelectedDate(date)}
+                        className={styles.resultRadio}
+                      />
+                    )}
+                    <span className={styles.resultAllDate}>{formatDate(date)}</span>
+                    <span className={styles.resultAllRight}>
+                      <span className={styles.resultAllNames}>{getNames(val).join(', ')}</span>
+                      <span className={styles.resultAllCount}>{getCount(val)}명</span>
+                    </span>
+                  </Row>
+                </li>
+                );
+              })}
             </ul>
           </div>
+
+          {isHost && (
+            <button
+              className={styles.resultConfirmBtn}
+              disabled={!selectedDate || confirming}
+              onClick={handleConfirm}
+            >
+              {confirming ? '처리 중...' : '확정 날짜 선택하기'}
+            </button>
+          )}
         </>
       )}
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>
   );
 }

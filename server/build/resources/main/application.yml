@@ -46,6 +46,9 @@ naver:
     client-id: ${NAVER_CLIENT_ID}
     client-secret: ${NAVER_CLIENT_SECRET}
     base-url: https://naveropenapi.apigw.ntruss.com
+  search:
+    client-id: ${NAVER_SEARCH_CLIENT_ID}
+    client-secret: ${NAVER_SEARCH_CLIENT_SECRET}
 
 app:
   front-url: ${FRONT_URL:http://localhost:3000}
