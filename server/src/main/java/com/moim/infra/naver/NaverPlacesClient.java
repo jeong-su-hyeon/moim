@@ -19,8 +19,8 @@ public class NaverPlacesClient {
 
     public NaverPlacesClient(
             WebClient.Builder webClientBuilder,
-            @Value("${naver.directions.client-id}") String clientId,
-            @Value("${naver.directions.client-secret}") String clientSecret) {
+            @Value("${naver.search.client-id}") String clientId,
+            @Value("${naver.search.client-secret}") String clientSecret) {
         this.webClient = webClientBuilder.build();
         this.clientId = clientId;
         this.clientSecret = clientSecret;
@@ -32,32 +32,33 @@ public class NaverPlacesClient {
     public List<PlaceResult> search(String query) {
         try {
             Map<String, Object> response = webClient.get()
-                .uri("https://maps.apigw.ntruss.com/map-geocode/v2/geocode",
-                    uri -> uri.queryParam("query", query).build())
-                .header("X-NCP-APIGW-API-KEY-ID", clientId)
-                .header("X-NCP-APIGW-API-KEY", clientSecret)
+                .uri("https://openapi.naver.com/v1/search/local.json",
+                    uri -> uri.queryParam("query", query).queryParam("display", 5).build())
+                .header("X-Naver-Client-Id", clientId)
+                .header("X-Naver-Client-Secret", clientSecret)
                 .retrieve()
                 .bodyToMono(Map.class)
                 .block();
 
-            if (response == null) { log.warn("Naver Geocoding: null response"); return Collections.emptyList(); }
+            if (response == null) { log.warn("Naver Search: null response"); return Collections.emptyList(); }
 
-            log.info("Naver Geocoding status={}, totalCount={}", response.get("status"), ((Map<?,?>)response.getOrDefault("meta", Map.of())).get("totalCount"));
+            List<Map<String, Object>> items = (List<Map<String, Object>>) response.get("items");
+            if (items == null || items.isEmpty()) { log.warn("Naver Search: empty items"); return Collections.emptyList(); }
 
-            List<Map<String, Object>> addresses = (List<Map<String, Object>>) response.get("addresses");
-            if (addresses == null || addresses.isEmpty()) { log.warn("Naver Geocoding: empty addresses"); return Collections.emptyList(); }
-
-            return addresses.stream()
-                .map(a -> new PlaceResult(
-                    (String) a.getOrDefault("roadAddress", a.getOrDefault("jibunAddress", query)),
-                    (String) a.getOrDefault("roadAddress", a.getOrDefault("jibunAddress", "")),
-                    Double.parseDouble(String.valueOf(a.get("y"))),
-                    Double.parseDouble(String.valueOf(a.get("x")))
-                ))
+            return items.stream()
+                .map(item -> {
+                    String title = String.valueOf(item.getOrDefault("title", "")).replaceAll("<[^>]+>", "");
+                    String address = String.valueOf(item.getOrDefault("roadAddress",
+                        item.getOrDefault("address", "")));
+                    // mapx=경도×1e7, mapy=위도×1e7 (문자열 정수)
+                    double lng = Double.parseDouble(String.valueOf(item.get("mapx"))) / 1e7;
+                    double lat = Double.parseDouble(String.valueOf(item.get("mapy"))) / 1e7;
+                    return new PlaceResult(title, address, lat, lng);
+                })
                 .toList();
 
         } catch (Exception e) {
-            log.error("Naver Geocoding API error: {}", e.getMessage());
+            log.error("Naver Search API error: {}", e.getMessage());
             return Collections.emptyList();
         }
     }

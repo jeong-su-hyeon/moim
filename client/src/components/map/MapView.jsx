@@ -25,7 +25,7 @@ export default function MapView({ roomId }) {
       const res = await registerPlace(roomId, name, address, lat, lng);
       const place = res.data.data;
       addCandidate(place);
-      const m = addMarker(place.lat, place.lng, place.name);
+      const m = addMarker(place.lat, place.lng, place.name, place.registeredByName);
       if (m) markerMapRef.current[place.id] = m;
     } catch {
       // 등록 실패 무시
@@ -49,7 +49,7 @@ export default function MapView({ roomId }) {
     if (!mapReady || candidates.length === 0) return;
     candidates.forEach((place) => {
       if (!markerMapRef.current[place.id]) {
-        const m = addMarker(place.lat, place.lng, place.name);
+        const m = addMarker(place.lat, place.lng, place.name, place.registeredByName);
         if (m) markerMapRef.current[place.id] = m;
       }
     });
@@ -82,7 +82,7 @@ export default function MapView({ roomId }) {
       const res = await registerPlace(roomId, result.name, result.address, result.lat, result.lng);
       const place = res.data.data;
       addCandidate(place);
-      const m = addMarker(place.lat, place.lng, place.name);
+      const m = addMarker(place.lat, place.lng, place.name, place.registeredByName);
       if (m) markerMapRef.current[place.id] = m;
     } catch {
     } finally {
@@ -108,7 +108,7 @@ export default function MapView({ roomId }) {
       <div className={styles.searchBar}>
         <input
           className={styles.searchInput}
-          placeholder="주소 검색 (예: 서울 강남구 테헤란로 427)"
+          placeholder="장소명 검색 (예: 강남역, 스타벅스 강남점)"
           value={searchQuery}
           onChange={(e) => { setSearchQuery(e.target.value); setSearchResults([]); }}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
