@@ -51,10 +51,10 @@ public class ScheduleService {
     }
 
     @Transactional(readOnly = true)
-    public List<LocalDate> getMyDates(UUID roomId, User user) {
+    public List<String> getMyDates(UUID roomId, User user) {
         roomService.validateParticipant(roomId, user.getId());
         return scheduleRepository.findByRoomIdAndUserId(roomId, user.getId()).stream()
-            .map(Schedule::getAvailableDate)
+            .map(s -> s.getAvailableDate().toString())
             .toList();
     }
 
