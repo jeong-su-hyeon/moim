@@ -76,6 +76,122 @@
   font-size: 14px;
 }
 
+/* 날짜 카드 헤더 (수정 버튼 포함) */
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.cardHeader .cardTitle {
+  margin-bottom: 0;
+}
+
+.editBtn {
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid #1a73e8;
+  border-radius: 4px;
+  color: #1a73e8;
+  background: #fff;
+  cursor: pointer;
+}
+
+.editBtn:hover {
+  background: #e8f0fe;
+}
+
+/* 날짜 수정 영역 */
+.editArea {
+  margin-top: 8px;
+}
+
+.dateList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.dateItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.dateItemSelected {
+  border-color: #1a73e8;
+  background: #e8f0fe;
+}
+
+.dateRadio {
+  accent-color: #1a73e8;
+}
+
+.dateLabel {
+  flex: 1;
+}
+
+.dateCount {
+  font-size: 12px;
+  color: #888;
+}
+
+.editActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.cancelBtn {
+  padding: 8px 16px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  background: #fff;
+}
+
+.cancelBtn:hover {
+  background: #f5f5f5;
+}
+
+.confirmBtn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #1a73e8;
+  color: #fff;
+  cursor: pointer;
+}
+
+.confirmBtn:disabled {
+  background: #a8c7fa;
+  cursor: not-allowed;
+}
+
+.confirmBtn:not(:disabled):hover {
+  background: #1558b0;
+}
+
+/* 토스트 배너 */
+.toastBanner {
+  background: #d93025;
+  color: #fff;
+  text-align: center;
+  padding: 10px;
+  font-size: 14px;
+}
+
 /* 시간 투표 */
 .timeVoteHeader {
   display: flex;

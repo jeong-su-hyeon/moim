@@ -66,6 +66,13 @@ public class RoomController {
         return ResponseEntity.ok(ApiResponse.ok(roomService.confirmRoom(roomId, request, user)));
     }
 
+    @DeleteMapping("/{roomId}/confirm")
+    public ResponseEntity<ApiResponse<RoomResponse>> unconfirmRoom(
+            @PathVariable UUID roomId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.ok(roomService.unconfirmRoom(roomId, user)));
+    }
+
     @GetMapping("/{roomId}/result")
     public ResponseEntity<ApiResponse<RoomResponse>> getResult(@PathVariable UUID roomId) {
         return ResponseEntity.ok(ApiResponse.ok(roomService.getResult(roomId)));

@@ -51,6 +51,14 @@ public class ScheduleService {
     }
 
     @Transactional(readOnly = true)
+    public List<LocalDate> getMyDates(UUID roomId, User user) {
+        roomService.validateParticipant(roomId, user.getId());
+        return scheduleRepository.findByRoomIdAndUserId(roomId, user.getId()).stream()
+            .map(Schedule::getAvailableDate)
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
     public Map<LocalDate, List<String>> getAggregated(UUID roomId, User user) {
         roomService.validateParticipant(roomId, user.getId());
 

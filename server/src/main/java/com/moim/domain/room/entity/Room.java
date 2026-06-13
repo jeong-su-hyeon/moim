@@ -62,6 +62,13 @@ public class Room {
         this.expiresAt = date.plusMonths(1).atStartOfDay();
     }
 
+    public void unconfirm() {
+        this.confirmedDate = null;
+        this.confirmedPlace = null;
+        this.expiresAt = null;
+        this.status = RoomStatus.ACTIVE;
+    }
+
     public void cancel() {
         this.status = RoomStatus.CANCELLED;
     }

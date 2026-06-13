@@ -1,7 +1,7 @@
 ﻿import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getRoom } from "../services/roomService.js";
-import { getAggregatedSchedules } from "../services/scheduleService.js";
+import { getAggregatedSchedules, getMySchedules } from "../services/scheduleService.js";
 import { getMessages } from "../services/chatService.js";
 import useRoomStore from "../stores/useRoomStore.js";
 import useScheduleStore from "../stores/useScheduleStore.js";
@@ -14,30 +14,33 @@ import useChatStore from "../stores/useChatStore.js";
  */
 export default function useRoom(roomId) {
   const navigate = useNavigate();
-  const { room, setRoom } = useRoomStore();
-  const { setAggregated } = useScheduleStore();
+  const { setRoom } = useRoomStore();
+  const { setAggregated, setMyDates } = useScheduleStore();
   const { setMessages } = useChatStore();
 
   useEffect(() => {
     if (!roomId) return;
-    // 스토어에 이미 이 방 데이터가 있으면 건너뜀 (mock 방 or 재진입)
-    if (room?.id === roomId) return;
 
     (async () => {
       try {
         const roomRes = await getRoom(roomId);
         setRoom(roomRes.data.data);
       } catch (err) {
-        if (err.response?.status === 404) {
-          navigate("/");
-        }
-        // 서버 미연결 등 그 외 에러 → 이미 스토어에 mock 방이 있을 수 있으므로 무시
+        // 404 포함 모든 에러 → 홈으로 이동 (에러 무시 시 로딩 화면에 영구 고착)
+        navigate("/");
         return;
       }
 
       // 부차적 데이터 — 실패해도 방 화면은 계속 표시
       getAggregatedSchedules(roomId)
         .then((r) => setAggregated(r.data.data ?? {}))
+        .catch(() => {});
+
+      getMySchedules(roomId)
+        .then((r) => {
+          const dates = (r.data.data ?? []).map((d) => String(d));
+          setMyDates(roomId, dates);
+        })
         .catch(() => {});
 
       getMessages(roomId)

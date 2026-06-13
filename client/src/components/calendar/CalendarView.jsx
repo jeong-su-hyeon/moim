@@ -118,7 +118,7 @@ export default function CalendarView({ roomId }) {
             onClick={() => clearDates(roomId)}
             disabled={myDates.length === 0}
           >
-            전체 취소
+            초기화
           </button>
           <button
             className={styles.saveBtn}

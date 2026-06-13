@@ -115,6 +115,19 @@ public class RoomService {
         return RoomResponse.from(room);
     }
 
+    @Transactional
+    public RoomResponse unconfirmRoom(UUID roomId, User requester) {
+        Room room = findRoom(roomId);
+        if (!room.isHost(requester.getId())) {
+            throw new BusinessException(ErrorCode.HOST_ONLY);
+        }
+        if (room.getStatus() != RoomStatus.CONFIRMED) {
+            throw new BusinessException(ErrorCode.ROOM_NOT_ACTIVE);
+        }
+        room.unconfirm();
+        return RoomResponse.from(room);
+    }
+
     @Transactional(readOnly = true)
     public RoomResponse getResult(UUID roomId) {
         Room room = findRoom(roomId);

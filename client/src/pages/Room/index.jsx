@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import useRoom from '../../hooks/useRoom.js';
 import useRoomStore from '../../stores/useRoomStore.js';
 import useAuthStore from '../../stores/useAuthStore.js';
-import { joinRoom } from '../../services/roomService.js';
+import { joinRoom, getRoom } from '../../services/roomService.js';
 import RoomLayout from '../../components/room/RoomLayout.jsx';
 import styles from './Room.module.css';
 
@@ -34,8 +34,9 @@ export default function Room() {
       setError(null);
       try {
         await joinRoom(roomId);
-        // 참가 완료 후 방 데이터 갱신을 위해 스토어 초기화 → useRoom이 재요청
-        useRoomStore.getState().clearRoom();
+        // 참가 완료 후 최신 방 데이터(참여자 포함)로 스토어 직접 갱신
+        const roomRes = await getRoom(roomId);
+        useRoomStore.getState().setRoom(roomRes.data.data);
       } catch (err) {
         const code = err.response?.data?.error?.code;
         if (code === 'ROOM_FULL') setError('방 인원이 가득 찼습니다. (최대 10명)');
