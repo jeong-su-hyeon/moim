@@ -73,7 +73,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 56px;
+  min-height: 64px;
   border: 1px solid #eee;
   border-radius: 6px;
   cursor: pointer;
@@ -108,6 +108,15 @@
   font-size: 10px;
   color: #1e88e5;
   font-weight: 600;
+}
+
+.nameList {
+  font-size: 9px;
+  color: #555;
+  text-align: center;
+  line-height: 1.3;
+  word-break: break-all;
+  padding: 0 2px;
 }
 
 .footer {

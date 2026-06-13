@@ -15,16 +15,22 @@ export default function CalendarView({ roomId }) {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
-  const { getMyDates, toggleDate, clearDates, aggregated } = useScheduleStore();
+  const { getMyDates, getSavedDates, toggleDate, clearDates, syncSavedDates, aggregated } = useScheduleStore();
   const { participants } = useRoomStore();
 
   const myDates = getMyDates(roomId);
+  const savedDates = getSavedDates(roomId);
+  // 저장되지 않은 새 선택 날짜
+  const newlySelected = myDates.filter(d => !savedDates.includes(d));
+  const hasSaved = savedDates.length > 0;
+  const hasNewlySelected = newlySelected.length > 0;
 
   const handleSave = async () => {
     if (myDates.length === 0) return;
     setSaving(true);
     try {
       await saveMyDates(roomId, myDates);
+      syncSavedDates(roomId);
       setToast('일정이 저장되었습니다.');
     } catch {
       setToast('저장에 실패했습니다. 다시 시도해주세요.');
@@ -101,9 +107,14 @@ export default function CalendarView({ roomId }) {
             >
               <span className={styles.dayNum}>{day}</span>
               {count > 0 && !isPast && (
-                <span className={styles.countBadge} style={{ opacity: 0.4 + ratio * 0.6 }}>
-                  {count}명
-                </span>
+                <>
+                  <span className={styles.countBadge} style={{ opacity: 0.4 + ratio * 0.6 }}>
+                    {count}명
+                  </span>
+                  <span className={styles.nameList}>
+                    {names.join(', ')}
+                  </span>
+                </>
               )}
             </button>
           );
@@ -115,8 +126,29 @@ export default function CalendarView({ roomId }) {
         <div className={styles.footerBtns}>
           <button
             className={styles.clearBtn}
-            onClick={() => clearDates(roomId)}
-            disabled={myDates.length === 0}
+            onClick={async () => {
+              // 저장 O + 새 선택 O → 토스트
+              if (hasSaved && hasNewlySelected) {
+                setToast('저장 후 초기화해주세요.');
+                return;
+              }
+              // 저장 X + 새 선택 O → 알림창 없이 UI만 초기화
+              if (!hasSaved) {
+                clearDates(roomId);
+                setToast('날짜가 취소되었습니다.');
+                return;
+              }
+              // 저장 O + 새 선택 X → 확인 후 서버에서 삭제
+              if (!window.confirm('선택한 날짜를 취소하시겠습니까?')) return;
+              try {
+                await saveMyDates(roomId, []);
+                clearDates(roomId);
+                setToast('날짜가 취소되었습니다.');
+              } catch {
+                setToast('초기화에 실패했습니다. 다시 시도해주세요.');
+              }
+            }}
+            disabled={!hasSaved && !hasNewlySelected}
           >
             초기화
           </button>

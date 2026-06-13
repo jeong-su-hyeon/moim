@@ -32,7 +32,7 @@ public class ScheduleController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<List<LocalDate>>> getMySchedule(
+    public ResponseEntity<ApiResponse<List<String>>> getMySchedule(
             @PathVariable UUID roomId,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ApiResponse.ok(scheduleService.getMyDates(roomId, user)));
