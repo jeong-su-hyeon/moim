@@ -272,3 +272,40 @@
   background: #b0bec5;
   cursor: default;
 }
+
+/* 확정된 날짜 행 강조 */
+.resultAllItemConfirmed {
+  background: #e8f5e9;
+  border-color: #a5d6a7 !important;
+}
+
+.confirmedBadge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2e7d32;
+  background: #c8e6c9;
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-left: 6px;
+}
+
+/* 확정 취소 버튼 (방장 전용, 목록 하단) */
+.unconfirmBtn {
+  width: 100%;
+  padding: 10px 0;
+  border: 1px solid #e53935;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #e53935;
+  background: #fff;
+  cursor: pointer;
+}
+
+.unconfirmBtn:hover:not(:disabled) {
+  background: #ffebee;
+}
+
+.unconfirmBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

@@ -17,6 +17,9 @@ const useScheduleStore = create((set, get) => ({
       return { myDatesByRoom: { ...state.myDatesByRoom, [roomId]: next } };
     }),
 
+  setMyDates: (roomId, dates) =>
+    set((state) => ({ myDatesByRoom: { ...state.myDatesByRoom, [roomId]: dates } })),
+
   clearDates: (roomId) =>
     set((state) => ({ myDatesByRoom: { ...state.myDatesByRoom, [roomId]: [] } })),
 

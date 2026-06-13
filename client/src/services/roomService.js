@@ -16,3 +16,6 @@ export const deleteRoom = (roomId) => api.delete(`/rooms/${roomId}`);
 
 export const confirmRoom = (roomId, date, placeId = null) =>
   api.post(`/rooms/${roomId}/confirm`, { date, placeId });
+
+export const unconfirmRoom = (roomId) =>
+  api.delete(`/rooms/${roomId}/confirm`);

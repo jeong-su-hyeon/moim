@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { TABS } from '../../constants/index.js';
 import CalendarView from '../calendar/CalendarView.jsx';
 import MapView from '../map/MapView.jsx';
@@ -10,7 +10,7 @@ import useScheduleStore from '../../stores/useScheduleStore.js';
 import useRoomStore from '../../stores/useRoomStore.js';
 import useAuthStore from '../../stores/useAuthStore.js';
 import { getAggregatedSchedules } from '../../services/scheduleService.js';
-import { confirmRoom } from '../../services/roomService.js';
+import { confirmRoom, unconfirmRoom } from '../../services/roomService.js';
 import styles from './RoomLayout.module.css';
 
 const NAV_ITEMS = [
@@ -99,14 +99,15 @@ export default function RoomLayout({ room }) {
 }
 
 function ResultView({ room, aggregated }) {
-  const { participants } = useRoomStore();
+  const { participants, setRoom } = useRoomStore();
   const { user } = useAuthStore();
   const isHost = room?.hostId === user?.id;
+  const isConfirmed = !!room?.confirmedDate;
   const totalCount = participants.length || 0;
   const [selectedDate, setSelectedDate] = useState(null);
   const [confirming, setConfirming] = useState(false);
+  const [unconfirming, setUnconfirming] = useState(false);
   const [toast, setToast] = useState(null);
-  const navigate = useNavigate();
 
   // aggregated: { "2026-06-01": ["김철수", "이영희"], ... }
   const entries = Object.entries(aggregated ?? {});
@@ -130,21 +131,37 @@ function ResultView({ room, aggregated }) {
     return `${dateStr} (${weekdays[d.getDay()]})`;
   };
 
-  const sortedEntries = [...entries].sort(([, a], [, b]) => getCount(b) - getCount(a));
+  const sortedEntries = [...entries].sort(([a], [b]) => a.localeCompare(b));
 
   const handleConfirm = async () => {
     if (!selectedDate) return;
     setConfirming(true);
     try {
-      await confirmRoom(room.id, selectedDate);
-      navigate(`/room/${room.id}/result`);
+      const res = await confirmRoom(room.id, selectedDate);
+      setRoom(res.data.data);
+      setSelectedDate(null);
     } catch (err) {
       const code = err.response?.data?.error?.code;
       if (code === 'FORBIDDEN') setToast('방장만 날짜를 확정할 수 있습니다.');
       else setToast('확정에 실패했습니다. 다시 시도해주세요.');
+    } finally {
       setConfirming(false);
     }
   };
+
+  const handleUnconfirm = async () => {
+    setUnconfirming(true);
+    try {
+      const res = await unconfirmRoom(room.id);
+      setRoom(res.data.data);
+    } catch {
+      setToast('확정 취소에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setUnconfirming(false);
+    }
+  };
+
+  const showSelectUI = isHost && !isConfirmed;
 
   return (
     <div className={styles.resultWrap}>
@@ -168,16 +185,22 @@ function ResultView({ room, aggregated }) {
           )}
 
           <div className={styles.resultAllWrap}>
-            <p className={styles.resultAllTitle}>전체 날짜별 인원</p>
+            <p className={styles.resultAllTitle}>날짜 후보</p>
             <ul className={styles.resultAllList}>
               {sortedEntries.map(([date, val]) => {
-                const Row = isHost ? 'label' : 'div';
+                const isConfirmedDate = isConfirmed && date === String(room.confirmedDate);
+                const Row = showSelectUI ? 'label' : 'div';
                 return (
                 <li key={date}>
                   <Row
-                    className={`${styles.resultAllItem} ${isHost ? styles.resultAllItemClickable : ''} ${selectedDate === date ? styles.resultAllItemSelected : ''}`}
+                    className={[
+                      styles.resultAllItem,
+                      showSelectUI ? styles.resultAllItemClickable : '',
+                      selectedDate === date ? styles.resultAllItemSelected : '',
+                      isConfirmedDate ? styles.resultAllItemConfirmed : '',
+                    ].join(' ')}
                   >
-                    {isHost && (
+                    {showSelectUI && (
                       <input
                         type="radio"
                         name="confirmedDate"
@@ -191,6 +214,7 @@ function ResultView({ room, aggregated }) {
                     <span className={styles.resultAllRight}>
                       <span className={styles.resultAllNames}>{getNames(val).join(', ')}</span>
                       <span className={styles.resultAllCount}>{getCount(val)}명</span>
+                      {isConfirmedDate && <span className={styles.confirmedBadge}>확정</span>}
                     </span>
                   </Row>
                 </li>
@@ -199,13 +223,23 @@ function ResultView({ room, aggregated }) {
             </ul>
           </div>
 
-          {isHost && (
+          {showSelectUI && (
             <button
               className={styles.resultConfirmBtn}
               disabled={!selectedDate || confirming}
               onClick={handleConfirm}
             >
               {confirming ? '처리 중...' : '확정 날짜 선택하기'}
+            </button>
+          )}
+
+          {isHost && isConfirmed && (
+            <button
+              className={styles.unconfirmBtn}
+              disabled={unconfirming}
+              onClick={handleUnconfirm}
+            >
+              {unconfirming ? '처리 중...' : '확정 날짜 취소'}
             </button>
           )}
         </>

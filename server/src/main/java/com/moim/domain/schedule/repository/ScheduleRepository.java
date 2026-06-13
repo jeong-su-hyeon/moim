@@ -12,6 +12,8 @@ import java.util.UUID;
 public interface ScheduleRepository extends JpaRepository<Schedule, UUID> {
     List<Schedule> findByRoomId(UUID roomId);
 
+    List<Schedule> findByRoomIdAndUserId(UUID roomId, UUID userId);
+
     @Modifying
     @Query("DELETE FROM Schedule s WHERE s.room.id = :roomId AND s.user.id = :userId")
     void deleteByRoomIdAndUserId(@Param("roomId") UUID roomId, @Param("userId") UUID userId);
