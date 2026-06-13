@@ -146,11 +146,52 @@
   min-height: 0;
 }
 
+/* 지도 래퍼: overlay anchor용 relative + flex so .map flex:1 works */
+.mapWrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  min-height: 0;
+}
+
 /* 지도 */
 .map {
   flex: 1;
   position: relative;
   background: #e8e8e8;
+}
+
+/* 위치 로딩 오버레이 */
+.geoOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(2px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.geoSpinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #1a73e8;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.geoText {
+  font-size: 13px;
+  color: #555;
 }
 
 .mapPlaceholder {

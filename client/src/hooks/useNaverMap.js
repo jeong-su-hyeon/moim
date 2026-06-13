@@ -185,5 +185,30 @@ export default function useNaverMap({ onMapClick } = {}) {
     mapRef.current?.panTo(new window.naver.maps.LatLng(lat, lng));
   };
 
-  return { containerRef, mapRef, mapReady, addMarker, removeMarker, panTo };
+  const setCenter = (lat, lng, zoom) => {
+    const map = mapRef.current;
+    if (!map || !window.naver?.maps) return;
+    map.setCenter(new window.naver.maps.LatLng(lat, lng));
+    if (zoom != null) map.setZoom(zoom);
+  };
+
+  // positions: Array<{ lat, lng }>
+  const fitBounds = (positions) => {
+    const map = mapRef.current;
+    if (!map || !window.naver?.maps || positions.length === 0) return;
+    if (positions.length === 1) {
+      map.setCenter(new window.naver.maps.LatLng(positions[0].lat, positions[0].lng));
+      map.setZoom(14);
+      return;
+    }
+    // 빈 생성자 대신 첫 번째 좌표로 초기화 후 나머지를 extend
+    const first = new window.naver.maps.LatLng(positions[0].lat, positions[0].lng);
+    const bounds = new window.naver.maps.LatLngBounds(first, first);
+    for (let i = 1; i < positions.length; i++) {
+      bounds.extend(new window.naver.maps.LatLng(positions[i].lat, positions[i].lng));
+    }
+    map.fitBounds(bounds, { top: 80, right: 60, bottom: 60, left: 60 });
+  };
+
+  return { containerRef, mapRef, mapReady, addMarker, removeMarker, panTo, setCenter, fitBounds };
 }
