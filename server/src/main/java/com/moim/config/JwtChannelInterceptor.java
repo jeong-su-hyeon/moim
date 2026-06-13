@@ -9,7 +9,8 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
-import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.messaging.support.MessageHeaderAccessor;
+
 import org.springframework.stereotype.Component;
 
 import java.security.Principal;
@@ -29,8 +30,12 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
+        // wrap() 대신 getAccessor() 사용 — 원본 메시지와 연결된 mutable accessor
+        // wrap()은 메시지와 분리된 새 accessor를 만들어 setUser()가 세션에 반영되지 않음
         StompHeaderAccessor accessor =
-            org.springframework.messaging.simp.stomp.StompHeaderAccessor.wrap(message);
+            MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+
+        if (accessor == null) return message;
 
         if (StompCommand.CONNECT.equals(accessor.getCommand())) {
             String authHeader = accessor.getFirstNativeHeader("Authorization");
@@ -51,9 +56,6 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
             });
 
             log.debug("WebSocket CONNECT authenticated: userId={}", userId);
-
-            // 헤더가 변경됐으므로 새 Message 객체로 재생성
-            return MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
         }
 
         return message;
