@@ -39,7 +39,6 @@ export default function RoomLayout({ room }) {
       await navigator.clipboard.writeText(url);
       setCopyToast('초대 링크가 복사되었습니다.');
     } catch {
-      // clipboard API 차단 환경 fallback
       const el = document.createElement('textarea');
       el.value = url;
       document.body.appendChild(el);
@@ -54,7 +53,7 @@ export default function RoomLayout({ room }) {
     (aggregated) => setAggregated(aggregated),
     [setAggregated]
   );
-  const { sendMessage } = useWebSocket(room?.id, { onScheduleUpdate });
+  const { sendMessage, loadMore } = useWebSocket(room?.id, { onScheduleUpdate });
 
   return (
     <div className={styles.layout}>
@@ -92,7 +91,7 @@ export default function RoomLayout({ room }) {
       </main>
 
       {/* 오른쪽 채팅 패널 */}
-      <ChatPanel roomId={room?.id} sendMessage={sendMessage} />
+      <ChatPanel roomId={room?.id} sendMessage={sendMessage} loadMore={loadMore} />
       {copyToast && <Toast message={copyToast} onClose={() => setCopyToast(null)} />}
     </div>
   );
@@ -109,7 +108,6 @@ function ResultView({ room, aggregated }) {
   const [unconfirming, setUnconfirming] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // aggregated: { "2026-06-01": ["김철수", "이영희"], ... }
   const entries = Object.entries(aggregated ?? {});
   const getNames = (val) => (Array.isArray(val) ? val : []);
   const getCount = (val) => getNames(val).length;

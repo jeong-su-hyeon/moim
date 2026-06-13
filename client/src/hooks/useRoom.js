@@ -2,10 +2,8 @@
 import { useNavigate } from "react-router-dom";
 import { getRoom } from "../services/roomService.js";
 import { getAggregatedSchedules, getMySchedules } from "../services/scheduleService.js";
-import { getMessages } from "../services/chatService.js";
 import useRoomStore from "../stores/useRoomStore.js";
 import useScheduleStore from "../stores/useScheduleStore.js";
-import useChatStore from "../stores/useChatStore.js";
 
 /**
  * 방 진입 시 데이터를 로드하는 훅
@@ -16,7 +14,6 @@ export default function useRoom(roomId) {
   const navigate = useNavigate();
   const { setRoom } = useRoomStore();
   const { setAggregated, setMyDates } = useScheduleStore();
-  const { setMessages } = useChatStore();
 
   useEffect(() => {
     if (!roomId) return;
@@ -43,9 +40,6 @@ export default function useRoom(roomId) {
         })
         .catch(() => {});
 
-      getMessages(roomId)
-        .then((r) => setMessages(r.data.data ?? []))
-        .catch(() => {});
     })();
   }, [roomId]);
 }
