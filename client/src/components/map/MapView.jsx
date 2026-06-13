@@ -14,6 +14,11 @@ export default function MapView({ roomId }) {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
+  // 'pending' | 'granted' | 'denied'
+  const [geoStatus, setGeoStatus] = useState('pending');
+  const geoRef = useRef(null); // { lat, lng }
+  const initialViewSet = useRef(false);
+  const [placesLoaded, setPlacesLoaded] = useState(false);
 
   // 마커 map: placeId → naver.maps.Marker
   const markerMapRef = useRef({});
@@ -34,14 +39,63 @@ export default function MapView({ roomId }) {
     }
   }, [roomId]);
 
-  const { containerRef, mapReady, addMarker, removeMarker, panTo } = useNaverMap({ onMapClick: handleMapClick });
+  const { containerRef, mapReady, addMarker, removeMarker, panTo, setCenter, fitBounds } = useNaverMap({ onMapClick: handleMapClick });
+
+  // 마운트 시 위치 권한 요청
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setGeoStatus('denied');
+      return;
+    }
+
+    const request = () => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          geoRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setGeoStatus('granted');
+        },
+        () => setGeoStatus('denied'),
+        { timeout: 10000 }
+      );
+    };
+
+    // Permissions API로 현재 상태를 먼저 확인 → 이미 denied면 팝업 없이 즉시 처리
+    if (navigator.permissions) {
+      navigator.permissions
+        .query({ name: 'geolocation' })
+        .then((result) => {
+          if (result.state === 'denied') {
+            setGeoStatus('denied');
+          } else {
+            request(); // 'granted'는 팝업 없이 성공, 'prompt'는 팝업 표시
+          }
+        })
+        .catch(request); // Permissions API 미지원 환경
+    } else {
+      request();
+    }
+  }, []);
+
+  // 초기 뷰 설정: 지도·위치 결과·후보지 로드 세 가지가 모두 준비된 뒤 한 번만 실행
+  useEffect(() => {
+    if (!mapReady || geoStatus === 'pending' || !placesLoaded || initialViewSet.current) return;
+    initialViewSet.current = true;
+
+    if (geoStatus === 'granted' && geoRef.current) {
+      setCenter(geoRef.current.lat, geoRef.current.lng, 14);
+    } else if (candidates.length > 0) {
+      fitBounds(candidates.map((c) => ({ lat: c.lat, lng: c.lng })));
+    }
+    // denied + 후보지 없음 → 기본값(서울) 유지
+  }, [mapReady, geoStatus, placesLoaded, candidates]);
 
   // 방 진입 시 기존 후보지 로드
   useEffect(() => {
     if (!roomId) return;
     getPlaces(roomId)
       .then((res) => setCandidates(res.data.data ?? []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setPlacesLoaded(true));
   }, [roomId]);
 
   // 지도 준비 + 후보지 모두 갖춰졌을 때 마커 표시
@@ -142,8 +196,16 @@ export default function MapView({ roomId }) {
 
       <div className={styles.body}>
         <div className={styles.mapArea}>
-          {/* 지도 컨테이너 */}
-          <div ref={containerRef} className={styles.map} />
+          {/* 지도 + 위치 로딩 오버레이 */}
+          <div className={styles.mapWrapper}>
+            <div ref={containerRef} className={styles.map} />
+            {geoStatus === 'pending' && (
+              <div className={styles.geoOverlay}>
+                <div className={styles.geoSpinner} />
+                <span className={styles.geoText}>현재 위치 확인 중...</span>
+              </div>
+            )}
+          </div>
 
           {/* 후보지 목록 */}
           <div className={styles.candidateList}>
