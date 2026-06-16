@@ -113,95 +113,7 @@
   color: #1a73e8;
 }
 
-
-.candidateBtn {
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-}
-
-.candidateActions {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-}
-
-.likeCol {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 40px;
-  gap: 2px;
-}
-
-.removeBtn {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  font-size: 9px;
-  color: #bbb;
-  padding: 1px 3px;
-  border-radius: 3px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  line-height: 1;
-  z-index: 1;
-}
-
-.removeBtn:hover {
-  color: #e53935;
-  background: #fce8e8;
-}
-
-.likeBtn {
-  font-size: 26px;
-  color: #bbb;
-  border: none;
-  background: none;
-  padding: 0 2px;
-  cursor: pointer;
-  flex-shrink: 0;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-}
-
-.likeBtn:hover {
-  color: #e57373;
-}
-
-.likeBtnActive {
-  color: #e53935;
-}
-
-.likeCount {
-  font-size: 11px;
-  color: #888;
-  flex-shrink: 0;
-  line-height: 1;
-}
-
-.registeredBy {
-  font-size: 11px;
-  color: #aaa;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 바디: 지도 + 사이드 */
+/* 바디 */
 .body {
   flex: 1;
   display: flex;
@@ -215,7 +127,7 @@
   min-height: 0;
 }
 
-/* 지도 래퍼: overlay anchor용 relative + flex so .map flex:1 works */
+/* 지도 */
 .mapWrapper {
   flex: 1;
   position: relative;
@@ -223,19 +135,17 @@
   min-height: 0;
 }
 
-/* 지도 */
 .map {
   flex: 1;
   position: relative;
   background: #e8e8e8;
 }
 
-/* 위치 로딩 오버레이 */
 .geoOverlay {
   position: absolute;
   inset: 0;
   z-index: 20;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255,255,255,0.72);
   backdrop-filter: blur(2px);
   display: flex;
   flex-direction: column;
@@ -263,47 +173,67 @@
   color: #555;
 }
 
-.mapPlaceholder {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: #888;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-/* 후보지 사이드 */
+/* 후보지 사이드 패널 */
 .candidateList {
   width: 220px;
   min-width: 220px;
   border-left: 1px solid #e0e0e0;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  padding: 8px;
+  overflow: hidden;
 }
 
 .candidateTitle {
   font-size: 13px;
   font-weight: 600;
-  margin-bottom: 8px;
-  padding-bottom: 6px;
+  padding: 8px 8px 6px;
   border-bottom: 1px solid #eee;
+  flex-shrink: 0;
+}
+
+.categorySection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.categorySection:last-child {
+  border-bottom: none;
+}
+
+.categoryHeader {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #444;
+  padding: 6px 8px;
+  background: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+
+.categoryItems {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px 6px;
 }
 
 .emptyMsg {
-  font-size: 12px;
-  color: #aaa;
+  font-size: 11px;
+  color: #bbb;
   line-height: 1.5;
-  padding: 4px 0;
+  padding: 4px 2px;
+  text-align: center;
 }
 
+/* 후보 장소 카드 */
 .candidateItem {
   position: relative;
-  padding: 6px 6px;
+  padding: 6px 4px;
   border-radius: 4px;
   display: flex;
   flex-direction: row;
@@ -322,14 +252,99 @@
   background: #e8f0fe;
 }
 
+.removeBtn {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  font-size: 9px;
+  color: #bbb;
+  padding: 1px 3px;
+  border-radius: 3px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  line-height: 1;
+  z-index: 1;
+}
+
+.removeBtn:hover {
+  color: #e53935;
+  background: #fce8e8;
+}
+
+.candidateBtn {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
 .placeName {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .placeAddr {
+  font-size: 10px;
+  color: #888;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.registeredBy {
+  font-size: 10px;
+  color: #aaa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.likeCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  gap: 2px;
+}
+
+.likeBtn {
+  font-size: 18px;
+  color: #bbb;
+  border: none;
+  background: none;
+  padding: 0 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.likeBtn:hover {
+  color: #e57373;
+}
+
+.likeBtnActive {
+  color: #e53935;
+}
+
+.likeCount {
   font-size: 11px;
   color: #888;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
 /* 이동 시간 패널 */
@@ -389,18 +404,4 @@
 .duration {
   font-weight: 600;
   color: #333;
-}
-
-.confirmBtn {
-  width: 100%;
-  padding: 8px;
-  background: #333;
-  color: #fff;
-  border-radius: 4px;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.confirmBtn:hover {
-  background: #555;
 }

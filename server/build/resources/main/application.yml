@@ -1,4 +1,8 @@
 spring:
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false   # LocalDateTime → "2026-06-13T12:30:00" 문자열
+
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/moim}
     username: ${DB_USER:moim}

@@ -75,6 +75,7 @@ public class LocationService {
             .address(request.getAddress())
             .lat(request.getLat())
             .lng(request.getLng())
+            .category(request.getCategory())
             .registeredBy(user)
             .build());
 

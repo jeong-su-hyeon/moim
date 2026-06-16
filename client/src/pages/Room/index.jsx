@@ -36,7 +36,9 @@ export default function Room() {
         await joinRoom(roomId);
         // 참가 완료 후 최신 방 데이터(참여자 포함)로 스토어 직접 갱신
         const roomRes = await getRoom(roomId);
-        useRoomStore.getState().setRoom(roomRes.data.data);
+        const roomData = roomRes.data.data;
+        useRoomStore.getState().setRoom(roomData);
+        useRoomStore.getState().setParticipants(roomData.participants ?? []);
       } catch (err) {
         const code = err.response?.data?.error?.code;
         if (code === 'ROOM_FULL') setError('방 인원이 가득 찼습니다. (최대 10명)');

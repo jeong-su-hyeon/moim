@@ -4,7 +4,14 @@ import useLocationStore from '../../stores/useLocationStore.js';
 import useRoomStore from '../../stores/useRoomStore.js';
 import { registerPlace, deletePlace, getPlaces, searchPlaces, togglePlaceLike } from '../../services/locationService.js';
 import useAuthStore from '../../stores/useAuthStore.js';
+import CategoryModal from './CategoryModal.jsx';
 import styles from './MapView.module.css';
+
+const CATEGORIES = [
+  { value: 'RESTAURANT', label: '식당',   emoji: '🍽️' },
+  { value: 'CAFE',       label: '카페',   emoji: '☕' },
+  { value: 'ACTIVITY',   label: '놀거리', emoji: '🎉' },
+];
 
 export default function MapView({ roomId }) {
   const { candidates, setCandidates, addCandidate, removeCandidate, updatePlaceLike } = useLocationStore();
@@ -16,13 +23,11 @@ export default function MapView({ roomId }) {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
-  // 'pending' | 'granted' | 'denied'
+  const [pendingResult, setPendingResult] = useState(null); // 카테고리 선택 대기 중인 검색결과
   const [geoStatus, setGeoStatus] = useState('pending');
-  const geoRef = useRef(null); // { lat, lng }
+  const geoRef = useRef(null);
   const initialViewSet = useRef(false);
   const [placesLoaded, setPlacesLoaded] = useState(false);
-
-  // 마커 map: placeId → naver.maps.Marker
   const markerMapRef = useRef({});
   const searchContainerRef = useRef(null);
 
@@ -30,13 +35,12 @@ export default function MapView({ roomId }) {
     const name = address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     setSaving(true);
     try {
-      const res = await registerPlace(roomId, name, address, lat, lng);
+      const res = await registerPlace(roomId, name, address, lat, lng, null);
       const place = res.data.data;
       addCandidate(place);
       const m = addMarker(place.lat, place.lng, place.name, place.registeredByName);
       if (m) markerMapRef.current[place.id] = m;
     } catch {
-      // 등록 실패 무시
     } finally {
       setSaving(false);
     }
@@ -44,55 +48,34 @@ export default function MapView({ roomId }) {
 
   const { containerRef, mapReady, addMarker, removeMarker, panTo, setCenter, fitBounds } = useNaverMap({ onMapClick: handleMapClick });
 
-  // 마운트 시 위치 권한 요청
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setGeoStatus('denied');
-      return;
-    }
-
+    if (!navigator.geolocation) { setGeoStatus('denied'); return; }
     const request = () => {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          geoRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setGeoStatus('granted');
-        },
+        (pos) => { geoRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude }; setGeoStatus('granted'); },
         () => setGeoStatus('denied'),
         { timeout: 10000 }
       );
     };
-
-    // Permissions API로 현재 상태를 먼저 확인 → 이미 denied면 팝업 없이 즉시 처리
     if (navigator.permissions) {
-      navigator.permissions
-        .query({ name: 'geolocation' })
-        .then((result) => {
-          if (result.state === 'denied') {
-            setGeoStatus('denied');
-          } else {
-            request(); // 'granted'는 팝업 없이 성공, 'prompt'는 팝업 표시
-          }
-        })
-        .catch(request); // Permissions API 미지원 환경
+      navigator.permissions.query({ name: 'geolocation' })
+        .then((r) => r.state === 'denied' ? setGeoStatus('denied') : request())
+        .catch(request);
     } else {
       request();
     }
   }, []);
 
-  // 초기 뷰 설정: 지도·위치 결과·후보지 로드 세 가지가 모두 준비된 뒤 한 번만 실행
   useEffect(() => {
     if (!mapReady || geoStatus === 'pending' || !placesLoaded || initialViewSet.current) return;
     initialViewSet.current = true;
-
     if (geoStatus === 'granted' && geoRef.current) {
       setCenter(geoRef.current.lat, geoRef.current.lng, 14);
     } else if (candidates.length > 0) {
       fitBounds(candidates.map((c) => ({ lat: c.lat, lng: c.lng })));
     }
-    // denied + 후보지 없음 → 기본값(서울) 유지
   }, [mapReady, geoStatus, placesLoaded, candidates]);
 
-  // 방 진입 시 기존 후보지 로드
   useEffect(() => {
     if (!roomId) return;
     getPlaces(roomId)
@@ -101,7 +84,6 @@ export default function MapView({ roomId }) {
       .finally(() => setPlacesLoaded(true));
   }, [roomId]);
 
-  // 지도 준비 + 후보지 모두 갖춰졌을 때 마커 표시
   useEffect(() => {
     if (!mapReady || candidates.length === 0) return;
     candidates.forEach((place) => {
@@ -114,29 +96,35 @@ export default function MapView({ roomId }) {
 
   const handleSearch = async () => {
     const query = searchQuery.trim();
-    console.log('[handleSearch] roomId:', roomId, 'query:', query);
     if (!query) return;
     setSearching(true);
     try {
       const res = await searchPlaces(roomId, query);
       const results = res.data.data ?? [];
-      setSearchResults(results);
-      if (results.length === 0) setSearchResults([{ empty: true }]);
-    } catch (err) {
-      console.error('[searchPlaces]', err.response?.status, err.response?.data);
+      setSearchResults(results.length === 0 ? [{ empty: true }] : results);
+    } catch {
       setSearchResults([{ empty: true }]);
     } finally {
       setSearching(false);
     }
   };
 
-  const handleSelectSearchResult = async (result) => {
+  // 검색 결과 선택 → 카테고리 모달 열기
+  const handleSelectSearchResult = (result) => {
     setSearchResults([]);
     setSearchQuery('');
     panTo(result.lat, result.lng);
+    setPendingResult(result);
+  };
+
+  // 카테고리 확인 → 장소 등록
+  const handleCategoryConfirm = async (category) => {
+    if (!pendingResult) return;
+    const result = pendingResult;
+    setPendingResult(null);
     setSaving(true);
     try {
-      const res = await registerPlace(roomId, result.name, result.address, result.lat, result.lng);
+      const res = await registerPlace(roomId, result.name, result.address, result.lat, result.lng, category);
       const place = res.data.data;
       addCandidate(place);
       const m = addMarker(place.lat, place.lng, place.name, place.registeredByName);
@@ -148,20 +136,17 @@ export default function MapView({ roomId }) {
   };
 
   const handleLike = async (place) => {
-    // 낙관적 업데이트: 클릭 즉시 UI 반영
     const wasLiked = place.likedByMe;
     const optimisticCount = (place.likeCount ?? 0) + (wasLiked ? -1 : 1);
     const optimisticIds = wasLiked
       ? (place.likedUserIds ?? []).filter((id) => id !== currentUserId)
       : [...(place.likedUserIds ?? []), currentUserId];
     updatePlaceLike(place.id, optimisticCount, optimisticIds, currentUserId);
-
     try {
       const res = await togglePlaceLike(roomId, place.id);
       const data = res.data.data;
       updatePlaceLike(data.placeId, data.likeCount, data.likedUserIds, currentUserId);
     } catch (err) {
-      // 실패 시 낙관적 업데이트 되돌리기
       console.error('[handleLike] failed:', err?.response?.status, err?.response?.data);
       updatePlaceLike(place.id, place.likeCount ?? 0, place.likedUserIds ?? [], currentUserId);
     }
@@ -181,7 +166,16 @@ export default function MapView({ roomId }) {
 
   return (
     <div className={styles.wrap}>
-      {/* 검색 결과 열릴 때 뒷배경 클릭 차단 */}
+      {/* 카테고리 선택 모달 */}
+      {pendingResult && (
+        <CategoryModal
+          placeName={pendingResult.name}
+          onConfirm={handleCategoryConfirm}
+          onCancel={() => setPendingResult(null)}
+        />
+      )}
+
+      {/* 검색 결과 backdrop */}
       {searchResults.length > 0 && (
         <div className={styles.searchBackdrop} onMouseDown={() => setSearchResults([])} />
       )}
@@ -200,7 +194,6 @@ export default function MapView({ roomId }) {
             {searching ? '검색 중' : '검색'}
           </button>
         </div>
-
         {searchResults.length > 0 && (
           <ul className={styles.searchResults}>
             {searchResults[0]?.empty ? (
@@ -219,13 +212,11 @@ export default function MapView({ roomId }) {
         )}
       </div>
 
-      {!mapReady && (
-        <p className={styles.mapLoading}>지도 불러오는 중...</p>
-      )}
+      {!mapReady && <p className={styles.mapLoading}>지도 불러오는 중...</p>}
 
       <div className={styles.body}>
         <div className={styles.mapArea}>
-          {/* 지도 + 위치 로딩 오버레이 */}
+          {/* 지도 */}
           <div className={styles.mapWrapper}>
             <div ref={containerRef} className={styles.map} />
             {geoStatus === 'pending' && (
@@ -236,49 +227,59 @@ export default function MapView({ roomId }) {
             )}
           </div>
 
-          {/* 후보지 목록 */}
+          {/* 후보지 목록 (카테고리별 세로 구분) */}
           <div className={styles.candidateList}>
             <h3 className={styles.candidateTitle}>
               후보 장소
               {saving && <span className={styles.savingDot}> 저장 중...</span>}
             </h3>
-            {candidates.length === 0 ? (
-              <p className={styles.emptyMsg}>지도를 클릭하거나 주소를 검색해 후보지를 추가하세요.</p>
-            ) : (
-              candidates.map((place) => (
-                <div
-                  key={place.id}
-                  className={`${styles.candidateItem} ${activePlace?.id === place.id ? styles.candidateItemActive : ''}`}
-                >
-                  {place.registeredBy === currentUserId && (
-                    <button
-                      className={styles.removeBtn}
-                      onClick={(e) => { e.stopPropagation(); handleRemove(place); }}
-                    >✕</button>
+            {CATEGORIES.map(({ value, label, emoji }) => {
+              const list = candidates.filter((p) => p.category === value);
+              return (
+                <div key={value} className={styles.categorySection}>
+                  <div className={styles.categoryHeader}>
+                    <span>{emoji}</span>
+                    <span>{label}</span>
+                  </div>
+                  <div className={styles.categoryItems}>
+                  {list.length === 0 ? (
+                    <p className={styles.emptyMsg}>우리 {label}도 하나 골라야해!</p>
+                  ) : (
+                    list.map((place) => (
+                      <div
+                        key={place.id}
+                        className={`${styles.candidateItem} ${activePlace?.id === place.id ? styles.candidateItemActive : ''}`}
+                      >
+                        {place.registeredBy === currentUserId && (
+                          <button
+                            className={styles.removeBtn}
+                            onClick={(e) => { e.stopPropagation(); handleRemove(place); }}
+                          >✕</button>
+                        )}
+                        <button
+                          className={styles.candidateBtn}
+                          onClick={() => { setActivePlace(place); panTo(place.lat, place.lng); }}
+                        >
+                          <span className={styles.placeName}>{place.name}</span>
+                          <span className={styles.placeAddr}>{place.address}</span>
+                          <span className={styles.registeredBy}>{place.registeredByName}</span>
+                        </button>
+                        <div className={styles.likeCol}>
+                          <button
+                            className={`${styles.likeBtn} ${place.likedByMe ? styles.likeBtnActive : ''}`}
+                            onClick={(e) => { e.stopPropagation(); handleLike(place); }}
+                          >
+                            {place.likedByMe ? '♥' : '♡'}
+                          </button>
+                          <span className={styles.likeCount}>{place.likeCount ?? 0}</span>
+                        </div>
+                      </div>
+                    ))
                   )}
-                  <button
-                    className={styles.candidateBtn}
-                    onClick={() => {
-                      setActivePlace(place);
-                      panTo(place.lat, place.lng);
-                    }}
-                  >
-                    <span className={styles.placeName}>{place.name}</span>
-                    <span className={styles.placeAddr}>{place.address}</span>
-                    <span className={styles.registeredBy}>{place.registeredByName}</span>
-                  </button>
-                  <div className={styles.likeCol}>
-                    <button
-                      className={`${styles.likeBtn} ${place.likedByMe ? styles.likeBtnActive : ''}`}
-                      onClick={(e) => { e.stopPropagation(); handleLike(place); }}
-                    >
-                      {place.likedByMe ? '♥' : '♡'}
-                    </button>
-                    <span className={styles.likeCount}>{place.likeCount ?? 0}</span>
                   </div>
                 </div>
-              ))
-            )}
+              );
+            })}
           </div>
         </div>
 

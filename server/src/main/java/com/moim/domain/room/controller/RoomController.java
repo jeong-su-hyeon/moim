@@ -3,6 +3,7 @@ package com.moim.domain.room.controller;
 import com.moim.domain.room.dto.ConfirmRequest;
 import com.moim.domain.room.dto.RoomCreateRequest;
 import com.moim.domain.room.dto.RoomResponse;
+import com.moim.domain.room.dto.RoomUpdateRequest;
 import com.moim.domain.room.service.RoomService;
 import com.moim.domain.user.entity.User;
 import com.moim.global.response.ApiResponse;
@@ -50,11 +51,28 @@ public class RoomController {
         return ResponseEntity.ok(ApiResponse.ok());
     }
 
+    @PatchMapping("/{roomId}")
+    public ResponseEntity<ApiResponse<RoomResponse>> updateRoom(
+            @PathVariable UUID roomId,
+            @Valid @RequestBody RoomUpdateRequest request,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.ok(roomService.updateRoom(roomId, request, user)));
+    }
+
     @DeleteMapping("/{roomId}")
     public ResponseEntity<ApiResponse<Void>> deleteRoom(
             @PathVariable UUID roomId,
             @AuthenticationPrincipal User user) {
         roomService.deleteRoom(roomId, user);
+        return ResponseEntity.ok(ApiResponse.ok());
+    }
+
+    @DeleteMapping("/{roomId}/leave")
+    public ResponseEntity<ApiResponse<Void>> leaveRoom(
+            @PathVariable UUID roomId,
+            @RequestParam(required = false) UUID newHostId,
+            @AuthenticationPrincipal User user) {
+        roomService.leaveRoom(roomId, user, newHostId);
         return ResponseEntity.ok(ApiResponse.ok());
     }
 

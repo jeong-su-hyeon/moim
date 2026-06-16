@@ -1,5 +1,6 @@
 package com.moim.domain.location.dto;
 
+import com.moim.domain.location.entity.PlaceCategory;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -26,4 +27,6 @@ public class PlaceRequest {
     @DecimalMin(value = "-180.0", message = "경도는 -180 이상이어야 합니다.")
     @DecimalMax(value = "180.0",  message = "경도는 180 이하이어야 합니다.")
     private Double lng;
+
+    private PlaceCategory category;
 }
