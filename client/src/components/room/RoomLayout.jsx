@@ -9,6 +9,7 @@ import useWebSocket from '../../hooks/useWebSocket.js';
 import useScheduleStore from '../../stores/useScheduleStore.js';
 import useRoomStore from '../../stores/useRoomStore.js';
 import useAuthStore from '../../stores/useAuthStore.js';
+import useLocationStore from '../../stores/useLocationStore.js';
 import { getAggregatedSchedules } from '../../services/scheduleService.js';
 import { confirmRoom, unconfirmRoom } from '../../services/roomService.js';
 import styles from './RoomLayout.module.css';
@@ -23,6 +24,7 @@ export default function RoomLayout({ room }) {
   const [activeTab, setActiveTab] = useState(TABS.DATE);
   const [copyToast, setCopyToast] = useState(null);
   const { setAggregated, aggregated } = useScheduleStore();
+  const { updatePlaceLike, addCandidate, removeCandidate } = useLocationStore();
 
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
@@ -53,7 +55,19 @@ export default function RoomLayout({ room }) {
     (aggregated) => setAggregated(aggregated),
     [setAggregated]
   );
-  const { sendMessage, loadMore } = useWebSocket(room?.id, { onScheduleUpdate });
+  const onLikeUpdate = useCallback(
+    (data) => {
+      const currentUserId = useAuthStore.getState().user?.id;
+      updatePlaceLike(data.placeId, data.likeCount, data.likedUserIds, currentUserId);
+    },
+    [updatePlaceLike]
+  );
+  const onPlaceUpdate = useCallback((data) => {
+    if (data.type === 'ADD') addCandidate(data.place);
+    else if (data.type === 'DELETE') removeCandidate(data.placeId);
+  }, [addCandidate, removeCandidate]);
+
+  const { sendMessage, loadMore } = useWebSocket(room?.id, { onScheduleUpdate, onLikeUpdate, onPlaceUpdate });
 
   return (
     <div className={styles.layout}>

@@ -11,12 +11,16 @@ import useChatStore from '../stores/useChatStore.js';
 import useAuthStore from '../stores/useAuthStore.js';
 import { getMessages } from '../services/chatService.js';
 
-export default function useWebSocket(roomId, { onScheduleUpdate } = {}) {
+export default function useWebSocket(roomId, { onScheduleUpdate, onLikeUpdate, onPlaceUpdate } = {}) {
   const clientRef = useRef(null);
   const { addMessage, setMessages, prependMessages, setConnected, clear } = useChatStore();
   const accessToken = useAuthStore((s) => s.accessToken);
   const onScheduleUpdateRef = useRef(onScheduleUpdate);
   useEffect(() => { onScheduleUpdateRef.current = onScheduleUpdate; }, [onScheduleUpdate]);
+  const onLikeUpdateRef = useRef(onLikeUpdate);
+  useEffect(() => { onLikeUpdateRef.current = onLikeUpdate; }, [onLikeUpdate]);
+  const onPlaceUpdateRef = useRef(onPlaceUpdate);
+  useEffect(() => { onPlaceUpdateRef.current = onPlaceUpdate; }, [onPlaceUpdate]);
 
   useEffect(() => {
     if (!roomId || !accessToken) return;
@@ -38,6 +42,14 @@ export default function useWebSocket(roomId, { onScheduleUpdate } = {}) {
 
         client.subscribe(`/topic/room/${roomId}/schedule`, (frame) => {
           try { onScheduleUpdateRef.current?.(JSON.parse(frame.body)); } catch {}
+        });
+
+        client.subscribe(`/topic/room/${roomId}/likes`, (frame) => {
+          try { onLikeUpdateRef.current?.(JSON.parse(frame.body)); } catch {}
+        });
+
+        client.subscribe(`/topic/room/${roomId}/places`, (frame) => {
+          try { onPlaceUpdateRef.current?.(JSON.parse(frame.body)); } catch {}
         });
 
         // REST로 히스토리 로드 (DESC → reverse → ASC)

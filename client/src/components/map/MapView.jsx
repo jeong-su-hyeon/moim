@@ -2,11 +2,13 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import useNaverMap from '../../hooks/useNaverMap.js';
 import useLocationStore from '../../stores/useLocationStore.js';
 import useRoomStore from '../../stores/useRoomStore.js';
-import { registerPlace, deletePlace, getPlaces, searchPlaces } from '../../services/locationService.js';
+import { registerPlace, deletePlace, getPlaces, searchPlaces, togglePlaceLike } from '../../services/locationService.js';
+import useAuthStore from '../../stores/useAuthStore.js';
 import styles from './MapView.module.css';
 
 export default function MapView({ roomId }) {
-  const { candidates, setCandidates, addCandidate, removeCandidate } = useLocationStore();
+  const { candidates, setCandidates, addCandidate, removeCandidate, updatePlaceLike } = useLocationStore();
+  const currentUserId = useAuthStore((s) => s.user?.id);
   const { participants } = useRoomStore();
   const [activePlace, setActivePlace] = useState(null);
   const [transport, setTransport] = useState('TRANSIT');
@@ -22,6 +24,7 @@ export default function MapView({ roomId }) {
 
   // 마커 map: placeId → naver.maps.Marker
   const markerMapRef = useRef({});
+  const searchContainerRef = useRef(null);
 
   const handleMapClick = useCallback(async (lat, lng, address) => {
     const name = address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
@@ -144,6 +147,26 @@ export default function MapView({ roomId }) {
     }
   };
 
+  const handleLike = async (place) => {
+    // 낙관적 업데이트: 클릭 즉시 UI 반영
+    const wasLiked = place.likedByMe;
+    const optimisticCount = (place.likeCount ?? 0) + (wasLiked ? -1 : 1);
+    const optimisticIds = wasLiked
+      ? (place.likedUserIds ?? []).filter((id) => id !== currentUserId)
+      : [...(place.likedUserIds ?? []), currentUserId];
+    updatePlaceLike(place.id, optimisticCount, optimisticIds, currentUserId);
+
+    try {
+      const res = await togglePlaceLike(roomId, place.id);
+      const data = res.data.data;
+      updatePlaceLike(data.placeId, data.likeCount, data.likedUserIds, currentUserId);
+    } catch (err) {
+      // 실패 시 낙관적 업데이트 되돌리기
+      console.error('[handleLike] failed:', err?.response?.status, err?.response?.data);
+      updatePlaceLike(place.id, place.likeCount ?? 0, place.likedUserIds ?? [], currentUserId);
+    }
+  };
+
   const handleRemove = async (place) => {
     try {
       await deletePlace(roomId, place.id);
@@ -158,37 +181,43 @@ export default function MapView({ roomId }) {
 
   return (
     <div className={styles.wrap}>
-      {/* 검색 바 */}
-      <div className={styles.searchBar}>
-        <input
-          className={styles.searchInput}
-          placeholder="장소명 검색 (예: 강남역, 스타벅스 강남점)"
-          value={searchQuery}
-          onChange={(e) => { setSearchQuery(e.target.value); setSearchResults([]); }}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-        />
-        <button className={styles.searchBtn} onClick={handleSearch} disabled={searching}>
-          {searching ? '검색 중' : '검색'}
-        </button>
-      </div>
-
-      {/* 검색 결과 드롭다운 */}
+      {/* 검색 결과 열릴 때 뒷배경 클릭 차단 */}
       {searchResults.length > 0 && (
-        <ul className={styles.searchResults}>
-          {searchResults[0]?.empty ? (
-            <li className={styles.searchResultEmpty}>검색 결과가 없습니다.</li>
-          ) : (
-            searchResults.map((r, i) => (
-              <li key={i}>
-                <button className={styles.searchResultItem} onClick={() => handleSelectSearchResult(r)}>
-                  <span className={styles.searchResultName}>{r.name}</span>
-                  <span className={styles.searchResultAddr}>{r.address}</span>
-                </button>
-              </li>
-            ))
-          )}
-        </ul>
+        <div className={styles.searchBackdrop} onMouseDown={() => setSearchResults([])} />
       )}
+
+      {/* 검색 바 + 결과 드롭다운 */}
+      <div className={styles.searchContainer} ref={searchContainerRef}>
+        <div className={styles.searchBar}>
+          <input
+            className={styles.searchInput}
+            placeholder="장소명 검색 (예: 강남역, 스타벅스 강남점)"
+            value={searchQuery}
+            onChange={(e) => { setSearchQuery(e.target.value); setSearchResults([]); }}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          />
+          <button className={styles.searchBtn} onClick={handleSearch} disabled={searching}>
+            {searching ? '검색 중' : '검색'}
+          </button>
+        </div>
+
+        {searchResults.length > 0 && (
+          <ul className={styles.searchResults}>
+            {searchResults[0]?.empty ? (
+              <li className={styles.searchResultEmpty}>검색 결과가 없습니다.</li>
+            ) : (
+              searchResults.map((r, i) => (
+                <li key={i}>
+                  <button className={styles.searchResultItem} onClick={() => handleSelectSearchResult(r)}>
+                    <span className={styles.searchResultName}>{r.name}</span>
+                    <span className={styles.searchResultAddr}>{r.address}</span>
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        )}
+      </div>
 
       {!mapReady && (
         <p className={styles.mapLoading}>지도 불러오는 중...</p>
@@ -221,6 +250,12 @@ export default function MapView({ roomId }) {
                   key={place.id}
                   className={`${styles.candidateItem} ${activePlace?.id === place.id ? styles.candidateItemActive : ''}`}
                 >
+                  {place.registeredBy === currentUserId && (
+                    <button
+                      className={styles.removeBtn}
+                      onClick={(e) => { e.stopPropagation(); handleRemove(place); }}
+                    >✕</button>
+                  )}
                   <button
                     className={styles.candidateBtn}
                     onClick={() => {
@@ -230,8 +265,17 @@ export default function MapView({ roomId }) {
                   >
                     <span className={styles.placeName}>{place.name}</span>
                     <span className={styles.placeAddr}>{place.address}</span>
+                    <span className={styles.registeredBy}>{place.registeredByName}</span>
                   </button>
-                  <button className={styles.removeBtn} onClick={() => handleRemove(place)}>✕</button>
+                  <div className={styles.likeCol}>
+                    <button
+                      className={`${styles.likeBtn} ${place.likedByMe ? styles.likeBtnActive : ''}`}
+                      onClick={(e) => { e.stopPropagation(); handleLike(place); }}
+                    >
+                      {place.likedByMe ? '♥' : '♡'}
+                    </button>
+                    <span className={styles.likeCount}>{place.likeCount ?? 0}</span>
+                  </div>
                 </div>
               ))
             )}
