@@ -1,6 +1,7 @@
 package com.moim.domain.location.dto;
 
 import com.moim.domain.location.entity.Place;
+import com.moim.domain.location.entity.PlaceCategory;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -19,6 +20,7 @@ public class PlaceResponse {
     private UUID registeredBy;
     private String registeredByName;
     private LocalDateTime createdAt;
+    private PlaceCategory category;
     private long likeCount;
     private boolean likedByMe;
 
@@ -33,6 +35,7 @@ public class PlaceResponse {
             .address(place.getAddress())
             .lat(place.getLat())
             .lng(place.getLng())
+            .category(place.getCategory())
             .registeredBy(place.getRegisteredBy().getId())
             .registeredByName(place.getRegisteredBy().getName())
             .createdAt(place.getCreatedAt())

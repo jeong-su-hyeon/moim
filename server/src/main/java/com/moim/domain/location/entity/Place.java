@@ -38,6 +38,10 @@ public class Place {
     @Column(nullable = false)
     private Double lng;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private PlaceCategory category;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "registered_by", nullable = false)
     private User registeredBy;

@@ -16,8 +16,8 @@ export const getPlaces = (roomId) => api.get(`/rooms/${roomId}/places`);
 export const searchPlaces = (roomId, query) =>
   api.get(`/rooms/${roomId}/places/search`, { params: { query } });
 
-export const registerPlace = (roomId, name, address, lat, lng) =>
-  api.post(`/rooms/${roomId}/places`, { name, address, lat, lng });
+export const registerPlace = (roomId, name, address, lat, lng, category) =>
+  api.post(`/rooms/${roomId}/places`, { name, address, lat, lng, category });
 
 export const deletePlace = (roomId, placeId) =>
   api.delete(`/rooms/${roomId}/places/${placeId}`);
