@@ -12,6 +12,7 @@ import com.moim.global.exception.ErrorCode;
 import com.moim.infra.naver.NaverDirectionsClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,9 +29,11 @@ public class LocationService {
     private final UserOriginRepository userOriginRepository;
     private final PlaceRepository placeRepository;
     private final TravelTimeRepository travelTimeRepository;
+    private final PlaceLikeRepository placeLikeRepository;
     private final RoomRepository roomRepository;
     private final RoomService roomService;
     private final NaverDirectionsClient naverDirectionsClient;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
     public void saveOrigin(UUID roomId, OriginRequest request, User user) {
@@ -75,7 +78,10 @@ public class LocationService {
             .registeredBy(user)
             .build());
 
-        return PlaceResponse.from(place);
+        PlaceResponse response = PlaceResponse.from(place, 0L, false);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/places",
+            PlaceUpdateMessage.add(response));
+        return response;
     }
 
     @Transactional
@@ -91,17 +97,43 @@ public class LocationService {
             throw new BusinessException(ErrorCode.ROOM_ACCESS_DENIED);
         }
 
-        // FK 제약 위반 방지: TravelTime 먼저 삭제 후 Place 삭제
+        // FK 제약 위반 방지: 연관 데이터 먼저 삭제 후 Place 삭제
+        placeLikeRepository.deleteByPlaceId(placeId);
         travelTimeRepository.deleteByPlaceId(placeId);
         placeRepository.deleteById(placeId);
+
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/places",
+            PlaceUpdateMessage.delete(placeId));
     }
 
     @Transactional(readOnly = true)
     public List<PlaceResponse> getPlaces(UUID roomId, User user) {
         roomService.validateParticipant(roomId, user.getId());
         return placeRepository.findByRoomId(roomId).stream()
-            .map(PlaceResponse::from)
+            .map(p -> PlaceResponse.from(
+                p,
+                placeLikeRepository.countByPlaceId(p.getId()),
+                placeLikeRepository.existsByPlaceIdAndUserId(p.getId(), user.getId())
+            ))
             .toList();
+    }
+
+    @Transactional
+    public LikeUpdateMessage toggleLike(UUID roomId, UUID placeId, User user) {
+        roomService.validateParticipant(roomId, user.getId());
+        Place place = placeRepository.findByIdAndRoomId(placeId, roomId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.PLACE_NOT_FOUND));
+
+        if (placeLikeRepository.existsByPlaceIdAndUserId(placeId, user.getId())) {
+            placeLikeRepository.deleteByPlaceIdAndUserId(placeId, user.getId());
+        } else {
+            placeLikeRepository.save(PlaceLike.builder().place(place).user(user).build());
+        }
+
+        List<UUID> likedUserIds = placeLikeRepository.findUserIdsByPlaceId(placeId);
+        LikeUpdateMessage message = new LikeUpdateMessage(placeId, likedUserIds.size(), likedUserIds);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/likes", message);
+        return message;
     }
 
     /**

@@ -24,3 +24,6 @@ export const deletePlace = (roomId, placeId) =>
 
 export const getTravelTimes = (roomId, placeId, transport) =>
   api.get(`/rooms/${roomId}/places/${placeId}/travel-times`, { params: { transport } });
+
+export const togglePlaceLike = (roomId, placeId) =>
+  api.post(`/rooms/${roomId}/places/${placeId}/like`);

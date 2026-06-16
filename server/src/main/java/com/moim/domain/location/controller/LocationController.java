@@ -74,6 +74,14 @@ public class LocationController {
         return ResponseEntity.ok(ApiResponse.ok());
     }
 
+    @PostMapping("/places/{placeId}/like")
+    public ResponseEntity<ApiResponse<LikeUpdateMessage>> toggleLike(
+            @PathVariable UUID roomId,
+            @PathVariable UUID placeId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.ok(locationService.toggleLike(roomId, placeId, user)));
+    }
+
     @GetMapping("/places/{placeId}/travel-times")
     public ResponseEntity<ApiResponse<List<TravelTimeResponse>>> getTravelTimes(
             @PathVariable UUID roomId,
