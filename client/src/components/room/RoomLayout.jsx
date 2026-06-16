@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useCallback, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { TABS } from '../../constants/index.js';
 import CalendarView from '../calendar/CalendarView.jsx';
 import MapView from '../map/MapView.jsx';
@@ -11,7 +11,7 @@ import useRoomStore from '../../stores/useRoomStore.js';
 import useAuthStore from '../../stores/useAuthStore.js';
 import useLocationStore from '../../stores/useLocationStore.js';
 import { getAggregatedSchedules } from '../../services/scheduleService.js';
-import { confirmRoom, unconfirmRoom } from '../../services/roomService.js';
+import { confirmRoom, unconfirmRoom, updateRoom, deleteRoom, leaveRoom } from '../../services/roomService.js';
 import styles from './RoomLayout.module.css';
 
 const NAV_ITEMS = [
@@ -23,8 +23,13 @@ const NAV_ITEMS = [
 export default function RoomLayout({ room }) {
   const [activeTab, setActiveTab] = useState(TABS.DATE);
   const [copyToast, setCopyToast] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
   const { setAggregated, aggregated } = useScheduleStore();
   const { updatePlaceLike, addCandidate, removeCandidate } = useLocationStore();
+  const { setRoom, setParticipants } = useRoomStore();
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
 
   const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
@@ -52,9 +57,18 @@ export default function RoomLayout({ room }) {
   };
 
   const onScheduleUpdate = useCallback(
-    (aggregated) => setAggregated(aggregated),
+    (agg) => setAggregated(agg),
     [setAggregated]
   );
+
+  const onRoomUpdate = useCallback(
+    (updatedRoom) => {
+      setRoom(updatedRoom);
+      setParticipants(updatedRoom.participants ?? []);
+    },
+    [setRoom, setParticipants]
+  );
+
   const onLikeUpdate = useCallback(
     (data) => {
       const currentUserId = useAuthStore.getState().user?.id;
@@ -62,12 +76,18 @@ export default function RoomLayout({ room }) {
     },
     [updatePlaceLike]
   );
+
   const onPlaceUpdate = useCallback((data) => {
     if (data.type === 'ADD') addCandidate(data.place);
     else if (data.type === 'DELETE') removeCandidate(data.placeId);
   }, [addCandidate, removeCandidate]);
 
-  const { sendMessage, loadMore } = useWebSocket(room?.id, { onScheduleUpdate, onLikeUpdate, onPlaceUpdate });
+  const { sendMessage, loadMore } = useWebSocket(room?.id, {
+    onScheduleUpdate,
+    onRoomUpdate,
+    onLikeUpdate,
+    onPlaceUpdate,
+  });
 
   return (
     <div className={styles.layout}>
@@ -92,9 +112,25 @@ export default function RoomLayout({ room }) {
             </li>
           ))}
         </ul>
-        <Link to="/" className={styles.homeBtn} title="홈으로">
-          🏠
-        </Link>
+        <div className={styles.navBottom}>
+          <button
+            className={styles.navIconBtn}
+            onClick={() => setShowParticipants(true)}
+            title="참여자 목록"
+          >
+            👥
+          </button>
+          <button
+            className={styles.navIconBtn}
+            onClick={() => setShowSettings(true)}
+            title="설정"
+          >
+            ⚙️
+          </button>
+          <Link to="/" className={styles.homeBtn} title="홈으로">
+            🏠
+          </Link>
+        </div>
       </nav>
 
       {/* 메인 콘텐츠 */}
@@ -106,7 +142,234 @@ export default function RoomLayout({ room }) {
 
       {/* 오른쪽 채팅 패널 */}
       <ChatPanel roomId={room?.id} sendMessage={sendMessage} loadMore={loadMore} />
+
       {copyToast && <Toast message={copyToast} onClose={() => setCopyToast(null)} />}
+
+      {/* 참여자 목록 모달 */}
+      {showParticipants && (
+        <ParticipantsModal
+          room={room}
+          onClose={() => setShowParticipants(false)}
+        />
+      )}
+
+      {/* 설정 모달 */}
+      {showSettings && (
+        <SettingsModal
+          room={room}
+          user={user}
+          onClose={() => setShowSettings(false)}
+          onRoomUpdated={(updated) => setRoom(updated)}
+          onDeleted={() => navigate('/')}
+          onLeft={() => navigate('/')}
+        />
+      )}
+    </div>
+  );
+}
+
+function ParticipantsModal({ room, onClose }) {
+  const { user } = useAuthStore();
+  const participants = room?.participants ?? [];
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <h3 className={styles.modalTitle}>참여자 목록</h3>
+          <button className={styles.modalClose} onClick={onClose}>✕</button>
+        </div>
+        <section className={styles.settingSection}>
+          <p className={styles.settingLabel}>{participants.length}명 참여 중</p>
+          <ul className={styles.participantList}>
+            {participants.map((p) => (
+              <li key={p.id} className={styles.participantItem}>
+                <div className={styles.participantAvatar}>
+                  {p.name?.charAt(0)}
+                </div>
+                <span className={styles.participantName}>
+                  {p.name}
+                  {p.id === user?.id && <span className={styles.meTag}>나</span>}
+                </span>
+                {p.id === room?.hostId && (
+                  <span className={styles.hostBadge}>👑 방장</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function SettingsModal({ room, user, onClose, onRoomUpdated, onDeleted, onLeft }) {
+  const isHost = room?.hostId === user?.id;
+  const others = (room?.participants ?? []).filter((p) => p.id !== user?.id);
+
+  const [step, setStep] = useState('main');
+  const [selectedNewHost, setSelectedNewHost] = useState(null);
+
+  const [renameValue, setRenameValue] = useState(room?.title ?? '');
+  const [renaming, setRenaming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const handleRename = async () => {
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === room?.title) return;
+    setRenaming(true);
+    try {
+      const res = await updateRoom(room.id, trimmed);
+      onRoomUpdated(res.data.data);
+      setToast('방 이름이 수정되었습니다.');
+    } catch {
+      setToast('이름 수정에 실패했습니다.');
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('약속방을 삭제하면 모든 데이터가 사라집니다. 정말 삭제하시겠습니까?')) return;
+    setDeleting(true);
+    try {
+      await deleteRoom(room.id);
+      onDeleted();
+    } catch {
+      setToast('삭제에 실패했습니다.');
+      setDeleting(false);
+    }
+  };
+
+  const handleLeaveClick = () => {
+    if (isHost && others.length > 0) {
+      setSelectedNewHost(others[0].id);
+      setStep('transferHost');
+    } else {
+      handleLeaveConfirm(null);
+    }
+  };
+
+  const handleLeaveConfirm = async (newHostId) => {
+    setLeaving(true);
+    try {
+      await leaveRoom(room.id, newHostId);
+      onLeft();
+    } catch {
+      setToast('나가기에 실패했습니다.');
+      setLeaving(false);
+    }
+  };
+
+  // ── 방장 위임 선택 화면 ──
+  if (step === 'transferHost') {
+    const selectedName = others.find((p) => p.id === selectedNewHost)?.name ?? '';
+    return (
+      <div className={styles.modalOverlay} onClick={onClose}>
+        <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+          <div className={styles.modalHeader}>
+            <h3 className={styles.modalTitle}>방장 위임</h3>
+            <button className={styles.modalClose} onClick={onClose}>✕</button>
+          </div>
+
+          <section className={styles.settingSection}>
+            <p className={styles.settingLabel}>방장을 넘길 참여자를 선택하세요</p>
+            <ul className={styles.participantList}>
+              {others.map((p) => (
+                <li key={p.id}>
+                  <label className={`${styles.participantItem} ${styles.participantItemSelectable}`}>
+                    <input
+                      type="radio"
+                      name="newHost"
+                      value={p.id}
+                      checked={selectedNewHost === p.id}
+                      onChange={() => setSelectedNewHost(p.id)}
+                      className={styles.participantRadio}
+                    />
+                    <div className={`${styles.participantAvatar} ${selectedNewHost === p.id ? styles.participantAvatarSelected : ''}`}>
+                      {p.name?.charAt(0)}
+                    </div>
+                    <span className={styles.participantName}>{p.name}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <div className={styles.transferFooter}>
+            <button
+              className={styles.leaveBtn}
+              onClick={() => handleLeaveConfirm(selectedNewHost)}
+              disabled={!selectedNewHost || leaving}
+            >
+              {leaving ? '처리 중...' : `${selectedName}에게 위임하고 나가기`}
+            </button>
+            <button className={styles.backLink} onClick={() => setStep('main')}>
+              설정으로 돌아가기
+            </button>
+          </div>
+
+          {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+        </div>
+      </div>
+    );
+  }
+
+  // ── 기본 설정 화면 ──
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <h3 className={styles.modalTitle}>약속방 설정</h3>
+          <button className={styles.modalClose} onClick={onClose}>✕</button>
+        </div>
+
+        <section className={styles.settingSection}>
+          <p className={styles.settingLabel}>약속방 이름 수정</p>
+          <div className={styles.renameRow}>
+            <input
+              className={styles.renameInput}
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+              maxLength={200}
+            />
+            <button
+              className={styles.renameBtn}
+              onClick={handleRename}
+              disabled={renaming || !renameValue.trim() || renameValue.trim() === room?.title}
+            >
+              {renaming ? '저장 중...' : '저장'}
+            </button>
+          </div>
+        </section>
+
+        <section className={styles.settingSection}>
+          <p className={styles.settingLabel}>기타</p>
+          <div className={styles.dangerGroup}>
+            <button
+              className={styles.leaveBtn}
+              onClick={handleLeaveClick}
+              disabled={leaving}
+            >
+              약속방 나가기
+            </button>
+            {isHost && (
+              <button
+                className={styles.deleteBtn}
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? '삭제 중...' : '약속방 삭제'}
+              </button>
+            )}
+          </div>
+        </section>
+
+        {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+      </div>
     </div>
   );
 }
@@ -116,7 +379,7 @@ function ResultView({ room, aggregated }) {
   const { user } = useAuthStore();
   const isHost = room?.hostId === user?.id;
   const isConfirmed = !!room?.confirmedDate;
-  const totalCount = participants.length || 0;
+  const totalCount = (room?.participants ?? participants).length || 0;
   const [selectedDate, setSelectedDate] = useState(null);
   const [confirming, setConfirming] = useState(false);
   const [unconfirming, setUnconfirming] = useState(false);

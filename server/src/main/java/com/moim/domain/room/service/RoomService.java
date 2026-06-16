@@ -5,6 +5,7 @@ import com.moim.domain.location.repository.PlaceRepository;
 import com.moim.domain.room.dto.ConfirmRequest;
 import com.moim.domain.room.dto.RoomCreateRequest;
 import com.moim.domain.room.dto.RoomResponse;
+import com.moim.domain.room.dto.RoomUpdateRequest;
 import com.moim.domain.room.entity.*;
 import com.moim.domain.room.repository.RoomParticipantRepository;
 import com.moim.domain.room.repository.RoomRepository;
@@ -12,6 +13,7 @@ import com.moim.domain.user.entity.User;
 import com.moim.global.exception.BusinessException;
 import com.moim.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +29,7 @@ public class RoomService {
     private final RoomRepository roomRepository;
     private final RoomParticipantRepository roomParticipantRepository;
     private final PlaceRepository placeRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
     public RoomResponse createRoom(RoomCreateRequest request, User host) {
@@ -35,7 +38,6 @@ public class RoomService {
             .host(host)
             .build());
 
-        // 방장을 첫 번째 참여자로 자동 등록
         roomParticipantRepository.save(RoomParticipant.builder()
             .id(new RoomParticipantId(room.getId(), host.getId()))
             .room(room)
@@ -60,7 +62,6 @@ public class RoomService {
 
     @Transactional
     public void joinRoom(UUID roomId, User user) {
-        // 비관적 락: 동시 참가 요청 시 한 건씩 순차 처리
         Room room = roomRepository.findByIdWithLock(roomId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
@@ -73,7 +74,6 @@ public class RoomService {
             throw new BusinessException(ErrorCode.ROOM_ALREADY_JOINED);
         }
 
-        // 락을 잡은 상태에서 인원 수 확인 → 레이스 컨디션 완전 방지
         if (roomParticipantRepository.countByIdRoomId(roomId) >= MAX_PARTICIPANTS) {
             throw new BusinessException(ErrorCode.ROOM_FULL);
         }
@@ -85,6 +85,17 @@ public class RoomService {
             .build());
     }
 
+    // 모든 참여자가 이름 수정 가능, 변경 시 전체 브로드캐스트
+    @Transactional
+    public RoomResponse updateRoom(UUID roomId, RoomUpdateRequest request, User requester) {
+        Room room = findRoom(roomId);
+        validateParticipant(roomId, requester.getId());
+        room.updateTitle(request.getTitle());
+        RoomResponse response = RoomResponse.from(room);
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/info", response);
+        return response;
+    }
+
     @Transactional
     public void deleteRoom(UUID roomId, User requester) {
         Room room = findRoom(roomId);
@@ -92,6 +103,43 @@ public class RoomService {
             throw new BusinessException(ErrorCode.HOST_ONLY);
         }
         roomRepository.delete(room);
+    }
+
+    // 방 나가기: 방장이 나가면 newHostId로 지정된 참여자에게 방장 이전, 마지막이면 방 삭제
+    @Transactional
+    public void leaveRoom(UUID roomId, User user, UUID newHostId) {
+        Room room = findRoom(roomId);
+
+        RoomParticipantId participantId = new RoomParticipantId(roomId, user.getId());
+        if (!roomParticipantRepository.existsById(participantId)) {
+            throw new BusinessException(ErrorCode.ROOM_ACCESS_DENIED);
+        }
+
+        roomParticipantRepository.deleteById(participantId);
+        roomParticipantRepository.flush();
+
+        int remaining = roomParticipantRepository.countByIdRoomId(roomId);
+        if (remaining == 0) {
+            roomRepository.delete(room);
+            return;
+        }
+
+        if (room.isHost(user.getId())) {
+            // 클라이언트가 지정한 참여자에게 방장 이전
+            RoomParticipantId newHostParticipantId = new RoomParticipantId(roomId,
+                newHostId != null ? newHostId : UUID.randomUUID());
+            RoomParticipant newHostParticipant = roomParticipantRepository
+                .findById(newHostParticipantId)
+                .orElseGet(() ->
+                    // 지정 참여자가 없으면 임의로 첫 번째 참여자
+                    roomParticipantRepository
+                        .findFirstByIdRoomIdAndIdUserIdNot(roomId, user.getId())
+                        .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND))
+                );
+            room.transferHost(newHostParticipant.getUser());
+        }
+
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/info", RoomResponse.from(room));
     }
 
     @Transactional
@@ -106,7 +154,6 @@ public class RoomService {
 
         Place confirmedPlace = null;
         if (request.getPlaceId() != null) {
-            // IDOR 방지: 이 방 소속 장소인지 검증
             confirmedPlace = placeRepository.findByIdAndRoomId(request.getPlaceId(), roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PLACE_NOT_FOUND));
         }

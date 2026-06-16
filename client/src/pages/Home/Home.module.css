@@ -184,6 +184,8 @@
   border: 1px solid #e8e8e8;
   border-radius: 10px;
   background: #fff;
+  text-decoration: none;
+  color: inherit;
   transition: box-shadow 0.15s, border-color 0.15s;
 }
 

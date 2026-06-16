@@ -73,6 +73,14 @@ public class Room {
         this.status = RoomStatus.CANCELLED;
     }
 
+    public void updateTitle(String title) {
+        this.title = title;
+    }
+
+    public void transferHost(User newHost) {
+        this.host = newHost;
+    }
+
     public boolean isHost(UUID userId) {
         return this.host.getId().equals(userId);
     }

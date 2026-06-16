@@ -49,7 +49,7 @@ export default function RoomNew() {
               className={styles.input}
               type="text"
               required
-              placeholder="예: 5월 주말 모임"
+              placeholder="5월 주말 모임"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
