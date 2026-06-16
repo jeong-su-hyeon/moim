@@ -9,6 +9,9 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
+    hmr: {
+      path: '/__vite_hmr',
+    },
     proxy: {
       "/api": {
         target: "http://localhost:8000",

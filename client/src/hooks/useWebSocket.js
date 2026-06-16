@@ -11,15 +11,17 @@ import useChatStore from '../stores/useChatStore.js';
 import useAuthStore from '../stores/useAuthStore.js';
 import { getMessages } from '../services/chatService.js';
 
-export default function useWebSocket(roomId, { onScheduleUpdate, onLikeUpdate, onPlaceUpdate } = {}) {
+export default function useWebSocket(roomId, { onScheduleUpdate, onRoomUpdate, onLikeUpdate, onPlaceUpdate } = {}) {
   const clientRef = useRef(null);
   const { addMessage, setMessages, prependMessages, setConnected, clear } = useChatStore();
   const accessToken = useAuthStore((s) => s.accessToken);
   const onScheduleUpdateRef = useRef(onScheduleUpdate);
-  useEffect(() => { onScheduleUpdateRef.current = onScheduleUpdate; }, [onScheduleUpdate]);
+  const onRoomUpdateRef = useRef(onRoomUpdate);
   const onLikeUpdateRef = useRef(onLikeUpdate);
-  useEffect(() => { onLikeUpdateRef.current = onLikeUpdate; }, [onLikeUpdate]);
   const onPlaceUpdateRef = useRef(onPlaceUpdate);
+  useEffect(() => { onScheduleUpdateRef.current = onScheduleUpdate; }, [onScheduleUpdate]);
+  useEffect(() => { onRoomUpdateRef.current = onRoomUpdate; }, [onRoomUpdate]);
+  useEffect(() => { onLikeUpdateRef.current = onLikeUpdate; }, [onLikeUpdate]);
   useEffect(() => { onPlaceUpdateRef.current = onPlaceUpdate; }, [onPlaceUpdate]);
 
   useEffect(() => {
@@ -42,6 +44,10 @@ export default function useWebSocket(roomId, { onScheduleUpdate, onLikeUpdate, o
 
         client.subscribe(`/topic/room/${roomId}/schedule`, (frame) => {
           try { onScheduleUpdateRef.current?.(JSON.parse(frame.body)); } catch {}
+        });
+
+        client.subscribe(`/topic/room/${roomId}/info`, (frame) => {
+          try { onRoomUpdateRef.current?.(JSON.parse(frame.body)); } catch {}
         });
 
         client.subscribe(`/topic/room/${roomId}/likes`, (frame) => {

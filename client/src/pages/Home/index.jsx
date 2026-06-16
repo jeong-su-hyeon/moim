@@ -30,7 +30,6 @@ export default function Home() {
   const handleJoinByLink = () => {
     const input = inviteInput.trim();
     if (!input) return;
-    // UUID 또는 전체 URL 모두 허용
     const uuidMatch = input.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
     if (uuidMatch) {
       navigate(`/room/${uuidMatch[0]}`);
@@ -46,7 +45,6 @@ export default function Home() {
 
   return (
     <div className={styles.page}>
-      {/* 헤더 */}
       <header className={styles.header}>
         <h1 className={styles.logo}>mo!m</h1>
         <div className={styles.headerRight}>
@@ -65,7 +63,6 @@ export default function Home() {
       </header>
 
       <main className={styles.main}>
-        {/* 히어로 */}
         <section className={styles.hero}>
           <h2>함께하는 일정, 쉽게 맞추세요</h2>
           <p>캘린더로 가능한 날짜를 공유하고, 지도로 최적의 장소를 찾아보세요.</p>
@@ -76,7 +73,6 @@ export default function Home() {
           )}
         </section>
 
-        {/* 초대 링크로 참가 */}
         {isAuthenticated && (
           <section className={styles.joinSection}>
             <p className={styles.joinLabel}>초대 링크로 참가</p>
@@ -88,14 +84,11 @@ export default function Home() {
                 onChange={(e) => setInviteInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleJoinByLink()}
               />
-              <button className={styles.joinBtn} onClick={handleJoinByLink}>
-                참가
-              </button>
+              <button className={styles.joinBtn} onClick={handleJoinByLink}>참가</button>
             </div>
           </section>
         )}
 
-        {/* 내 약속방 목록 */}
         {isAuthenticated && (
           <section className={styles.roomSection}>
             <div className={styles.sectionHeader}>
