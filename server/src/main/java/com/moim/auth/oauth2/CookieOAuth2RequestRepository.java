@@ -1,33 +1,23 @@
 package com.moim.auth.oauth2;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.client.web.AuthorizationRequestRepository;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.stereotype.Component;
+import org.springframework.util.SerializationUtils;
 
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Optional;
 
-/**
- * OAuth2 인가 요청 상태를 쿠키에 저장 — stateless JWT 환경에서 HttpSession 대체.
- *
- * 주의: Spring의 SerializationUtils(Java 직렬화)는 역직렬화 취약점 위험이 있어
- * Jackson 기반 직렬화로 대체한다.
- */
 @Component
-@RequiredArgsConstructor
 public class CookieOAuth2RequestRepository
         implements AuthorizationRequestRepository<OAuth2AuthorizationRequest> {
 
     private static final String COOKIE_NAME = "oauth2_auth_request";
     private static final int    COOKIE_MAX_AGE_SEC = 180; // 3분
-
-    private final ObjectMapper objectMapper;
 
     @Override
     public OAuth2AuthorizationRequest loadAuthorizationRequest(HttpServletRequest request) {
@@ -81,20 +71,15 @@ public class CookieOAuth2RequestRepository
     }
 
     private String serialize(OAuth2AuthorizationRequest request) {
-        try {
-            byte[] json = objectMapper.writeValueAsBytes(request);
-            return Base64.getUrlEncoder().encodeToString(json);
-        } catch (Exception e) {
-            throw new RuntimeException("OAuth2 request serialization failed", e);
-        }
+        return Base64.getUrlEncoder().encodeToString(SerializationUtils.serialize(request));
     }
 
     private OAuth2AuthorizationRequest deserialize(String value) {
         try {
-            byte[] json = Base64.getUrlDecoder().decode(value);
-            return objectMapper.readValue(json, OAuth2AuthorizationRequest.class);
+            byte[] bytes = Base64.getUrlDecoder().decode(value);
+            return (OAuth2AuthorizationRequest) SerializationUtils.deserialize(bytes);
         } catch (Exception e) {
-            return null; // 역직렬화 실패 시 null 반환 → 인가 요청 재시작
+            return null;
         }
     }
 }

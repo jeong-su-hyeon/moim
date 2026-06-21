@@ -51,6 +51,10 @@ public class Room {
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
 
+    @Column(name = "max_participants", nullable = false)
+    @Builder.Default
+    private int maxParticipants = 10;
+
     @OneToMany(mappedBy = "room", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<RoomParticipant> participants = new ArrayList<>();
@@ -75,6 +79,10 @@ public class Room {
 
     public void updateTitle(String title) {
         this.title = title;
+    }
+
+    public void updateMaxParticipants(int maxParticipants) {
+        this.maxParticipants = maxParticipants;
     }
 
     public void transferHost(User newHost) {

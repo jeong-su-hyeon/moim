@@ -181,7 +181,7 @@ function ParticipantsModal({ room, onClose }) {
           <button className={styles.modalClose} onClick={onClose}>✕</button>
         </div>
         <section className={styles.settingSection}>
-          <p className={styles.settingLabel}>{participants.length}명 참여 중</p>
+          <p className={styles.settingLabel}>{participants.length} / {room?.maxParticipants ?? 10}명 참여 중</p>
           <ul className={styles.participantList}>
             {participants.map((p) => (
               <li key={p.id} className={styles.participantItem}>
@@ -212,6 +212,7 @@ function SettingsModal({ room, user, onClose, onRoomUpdated, onDeleted, onLeft }
   const [selectedNewHost, setSelectedNewHost] = useState(null);
 
   const [renameValue, setRenameValue] = useState(room?.title ?? '');
+  const [maxParticipants, setMaxParticipants] = useState(room?.maxParticipants ?? 10);
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -219,14 +220,24 @@ function SettingsModal({ room, user, onClose, onRoomUpdated, onDeleted, onLeft }
 
   const handleRename = async () => {
     const trimmed = renameValue.trim();
-    if (!trimmed || trimmed === room?.title) return;
+    const titleChanged = trimmed && trimmed !== room?.title;
+    const maxChanged = isHost && maxParticipants !== (room?.maxParticipants ?? 10);
+    if (!titleChanged && !maxChanged) return;
     setRenaming(true);
     try {
-      const res = await updateRoom(room.id, trimmed);
+      const payload = {};
+      if (titleChanged) payload.title = trimmed;
+      if (maxChanged) payload.maxParticipants = maxParticipants;
+      const res = await updateRoom(room.id, payload);
       onRoomUpdated(res.data.data);
-      setToast('방 이름이 수정되었습니다.');
-    } catch {
-      setToast('이름 수정에 실패했습니다.');
+      setToast('설정이 저장되었습니다.');
+    } catch (err) {
+      const code = err.response?.data?.error?.code;
+      if (code === 'MAX_PARTICIPANTS_TOO_SMALL') {
+        setToast('현재 참여 인원보다 적게 설정할 수 없습니다.');
+      } else {
+        setToast('저장에 실패했습니다.');
+      }
     } finally {
       setRenaming(false);
     }
@@ -319,6 +330,11 @@ function SettingsModal({ room, user, onClose, onRoomUpdated, onDeleted, onLeft }
   }
 
   // ── 기본 설정 화면 ──
+  const currentCount = room?.participants?.length ?? 0;
+  const hasChanges =
+    (renameValue.trim() && renameValue.trim() !== room?.title) ||
+    (isHost && maxParticipants !== (room?.maxParticipants ?? 10));
+
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
@@ -327,28 +343,53 @@ function SettingsModal({ room, user, onClose, onRoomUpdated, onDeleted, onLeft }
           <button className={styles.modalClose} onClick={onClose}>✕</button>
         </div>
 
-        <section className={styles.settingSection}>
-          <p className={styles.settingLabel}>약속방 이름 수정</p>
-          <div className={styles.renameRow}>
+        <div className={styles.settingsBody}>
+          {/* 방 이름 */}
+          <div className={styles.fieldGroup}>
+            <label className={styles.fieldLabel}>방 이름</label>
             <input
-              className={styles.renameInput}
+              className={styles.fieldInput}
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleRename()}
               maxLength={200}
             />
-            <button
-              className={styles.renameBtn}
-              onClick={handleRename}
-              disabled={renaming || !renameValue.trim() || renameValue.trim() === room?.title}
-            >
-              {renaming ? '저장 중...' : '저장'}
-            </button>
           </div>
-        </section>
 
-        <section className={styles.settingSection}>
-          <p className={styles.settingLabel}>기타</p>
+          {/* 최대 인원 */}
+          {isHost && (
+            <div className={styles.fieldGroup}>
+              <label className={styles.fieldLabel}>최대 인원</label>
+              <div className={styles.stepperWrap}>
+                <button
+                  type="button"
+                  className={styles.stepBtn}
+                  onClick={() => setMaxParticipants((v) => Math.max(1, v - 1))}
+                  disabled={maxParticipants <= currentCount}
+                >−</button>
+                <span className={styles.stepValue}>{maxParticipants}명</span>
+                <button
+                  type="button"
+                  className={styles.stepBtn}
+                  onClick={() => setMaxParticipants((v) => Math.min(10, v + 1))}
+                  disabled={maxParticipants >= 10}
+                >+</button>
+              </div>
+              <p className={styles.stepHint}>현재 {currentCount}명 참여 중</p>
+            </div>
+          )}
+
+          {/* 저장 버튼 */}
+          <button
+            className={styles.saveBtn}
+            onClick={handleRename}
+            disabled={renaming || !hasChanges}
+          >
+            {renaming ? '저장 중...' : '저장하기'}
+          </button>
+
+          {/* 구분선 + 위험 액션 */}
+          <div className={styles.dangerDivider} />
           <div className={styles.dangerGroup}>
             <button
               className={styles.leaveBtn}
@@ -367,7 +408,7 @@ function SettingsModal({ room, user, onClose, onRoomUpdated, onDeleted, onLeft }
               </button>
             )}
           </div>
-        </section>
+        </div>
 
         {toast && <Toast message={toast} onClose={() => setToast(null)} />}
       </div>

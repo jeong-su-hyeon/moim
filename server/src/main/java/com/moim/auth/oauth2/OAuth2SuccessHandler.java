@@ -16,6 +16,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
@@ -44,7 +45,9 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     public void onAuthenticationSuccess(HttpServletRequest request,
                                         HttpServletResponse response,
                                         Authentication authentication) throws IOException {
+        OAuth2AuthenticationToken oauthToken = (OAuth2AuthenticationToken) authentication;
         DefaultOAuth2User oAuth2User = (DefaultOAuth2User) authentication.getPrincipal();
+        String registrationId = oauthToken.getAuthorizedClientRegistrationId();
         UUID userId = UUID.fromString((String) oAuth2User.getAttributes().get("id"));
 
         User user = userRepository.findById(userId)
@@ -73,7 +76,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         // Access Token → 프론트 URL 쿼리 파라미터 (짧은 수명이므로 허용)
         String redirectUrl = UriComponentsBuilder
-            .fromUriString(frontUrl + "/auth/callback/oauth")
+            .fromUriString(frontUrl + "/auth/callback/" + registrationId)
             .queryParam("token", accessToken)
             .build().toUriString();
 

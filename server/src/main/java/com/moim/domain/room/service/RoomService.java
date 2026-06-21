@@ -33,9 +33,11 @@ public class RoomService {
 
     @Transactional
     public RoomResponse createRoom(RoomCreateRequest request, User host) {
+        int maxParticipants = request.getMaxParticipants() != null ? request.getMaxParticipants() : MAX_PARTICIPANTS;
         Room room = roomRepository.save(Room.builder()
             .title(request.getTitle())
             .host(host)
+            .maxParticipants(maxParticipants)
             .build());
 
         roomParticipantRepository.save(RoomParticipant.builder()
@@ -74,7 +76,7 @@ public class RoomService {
             throw new BusinessException(ErrorCode.ROOM_ALREADY_JOINED);
         }
 
-        if (roomParticipantRepository.countByIdRoomId(roomId) >= MAX_PARTICIPANTS) {
+        if (roomParticipantRepository.countByIdRoomId(roomId) >= room.getMaxParticipants()) {
             throw new BusinessException(ErrorCode.ROOM_FULL);
         }
 
@@ -85,12 +87,23 @@ public class RoomService {
             .build());
     }
 
-    // 모든 참여자가 이름 수정 가능, 변경 시 전체 브로드캐스트
+    // 이름 수정은 모든 참여자, maxParticipants 수정은 방장만 가능
     @Transactional
     public RoomResponse updateRoom(UUID roomId, RoomUpdateRequest request, User requester) {
         Room room = findRoom(roomId);
         validateParticipant(roomId, requester.getId());
-        room.updateTitle(request.getTitle());
+        if (request.getTitle() != null && !request.getTitle().isBlank()) {
+            room.updateTitle(request.getTitle());
+        }
+        if (request.getMaxParticipants() != null) {
+            if (!room.isHost(requester.getId())) {
+                throw new BusinessException(ErrorCode.HOST_ONLY);
+            }
+            if (request.getMaxParticipants() < room.getParticipantCount()) {
+                throw new BusinessException(ErrorCode.MAX_PARTICIPANTS_TOO_SMALL);
+            }
+            room.updateMaxParticipants(request.getMaxParticipants());
+        }
         RoomResponse response = RoomResponse.from(room);
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/info", response);
         return response;

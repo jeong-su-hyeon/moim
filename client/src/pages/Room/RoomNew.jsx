@@ -8,6 +8,7 @@ import styles from "./RoomNew.module.css";
 export default function RoomNew() {
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
+  const [maxParticipants, setMaxParticipants] = useState(10);
   const [error, setError] = useState("");
   const setRoom = useRoomStore((s) => s.setRoom);
   const user = useAuthStore((s) => s.user);
@@ -16,7 +17,7 @@ export default function RoomNew() {
     e.preventDefault();
     setError("");
     try {
-      const res = await createRoom(title);
+      const res = await createRoom(title, maxParticipants);
       navigate(`/room/${res.data.data.id}`);
     } catch (err) {
       // 서버 미연결(네트워크 에러)이면 mock 방으로 이동
@@ -54,6 +55,24 @@ export default function RoomNew() {
               onChange={(e) => setTitle(e.target.value)}
             />
           </label>
+          <div className={styles.label}>
+            최대 인원 수
+            <div className={styles.stepper}>
+              <button
+                type="button"
+                className={styles.stepBtn}
+                onClick={() => setMaxParticipants((v) => Math.max(1, v - 1))}
+                disabled={maxParticipants <= 1}
+              >−</button>
+              <span className={styles.stepValue}>{maxParticipants}명</span>
+              <button
+                type="button"
+                className={styles.stepBtn}
+                onClick={() => setMaxParticipants((v) => Math.min(10, v + 1))}
+                disabled={maxParticipants >= 10}
+              >+</button>
+            </div>
+          </div>
           {error && <p className={styles.error}>{error}</p>}
           <div className={styles.actions}>
             <Link className={styles.cancelBtn} to="/">취소</Link>

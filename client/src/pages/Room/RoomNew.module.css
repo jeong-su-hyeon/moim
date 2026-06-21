@@ -86,3 +86,40 @@
 .createBtn:hover {
   background: #1558b0;
 }
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.stepBtn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 16px;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.stepBtn:hover:not(:disabled) {
+  background: #f0f0f0;
+}
+
+.stepBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.stepValue {
+  font-size: 16px;
+  font-weight: 600;
+  min-width: 36px;
+  text-align: center;
+}
