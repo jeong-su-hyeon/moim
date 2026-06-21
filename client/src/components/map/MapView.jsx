@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import useNaverMap from '../../hooks/useNaverMap.js';
 import useLocationStore from '../../stores/useLocationStore.js';
 import useRoomStore from '../../stores/useRoomStore.js';
@@ -31,22 +31,9 @@ export default function MapView({ roomId }) {
   const markerMapRef = useRef({});
   const searchContainerRef = useRef(null);
 
-  const handleMapClick = useCallback(async (lat, lng, address) => {
-    const name = address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    setSaving(true);
-    try {
-      const res = await registerPlace(roomId, name, address, lat, lng, null);
-      const place = res.data.data;
-      addCandidate(place);
-      const m = addMarker(place.lat, place.lng, place.name, place.registeredByName);
-      if (m) markerMapRef.current[place.id] = m;
-    } catch {
-    } finally {
-      setSaving(false);
-    }
-  }, [roomId]);
-
-  const { containerRef, mapReady, addMarker, removeMarker, panTo, setCenter, fitBounds } = useNaverMap({ onMapClick: handleMapClick });
+  // 장소 등록은 검색 결과 목록을 선택했을 때만 이루어진다.
+  // 지도 클릭이나 후보 마커 클릭으로는 어떤 등록/이벤트도 발생하지 않는다.
+  const { containerRef, mapReady, addMarker, removeMarker, panTo, setCenter, fitBounds } = useNaverMap();
 
   useEffect(() => {
     if (!navigator.geolocation) { setGeoStatus('denied'); return; }
@@ -78,6 +65,14 @@ export default function MapView({ roomId }) {
 
   useEffect(() => {
     if (!roomId) return;
+    // 방을 바꿔도 같은 <Room/> 컴포넌트와 지도 인스턴스가 재사용되므로,
+    // 이전 방에서 찍힌 마커를 먼저 전부 지우고 새 방의 후보 장소를 불러온다.
+    Object.values(markerMapRef.current).forEach((m) => removeMarker(m));
+    markerMapRef.current = {};
+    setCandidates([]);
+    setActivePlace(null);
+    initialViewSet.current = false;
+    setPlacesLoaded(false);
     getPlaces(roomId)
       .then((res) => setCandidates(res.data.data ?? []))
       .catch(() => {})
@@ -85,7 +80,18 @@ export default function MapView({ roomId }) {
   }, [roomId]);
 
   useEffect(() => {
-    if (!mapReady || candidates.length === 0) return;
+    if (!mapReady) return;
+    const candidateIds = new Set(candidates.map((p) => p.id));
+
+    // candidates에서 빠진(삭제되었거나 더 이상 유효하지 않은) 마커는 지도에서 제거
+    Object.keys(markerMapRef.current).forEach((id) => {
+      if (!candidateIds.has(id)) {
+        removeMarker(markerMapRef.current[id]);
+        delete markerMapRef.current[id];
+      }
+    });
+
+    // candidates에 새로 추가된 장소만 마커로 표시
     candidates.forEach((place) => {
       if (!markerMapRef.current[place.id]) {
         const m = addMarker(place.lat, place.lng, place.name, place.registeredByName);
