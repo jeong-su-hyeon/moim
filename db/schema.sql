@@ -58,6 +58,7 @@ CREATE TABLE rooms (
     confirmed_place_id UUID,
     created_at         TIMESTAMP    NOT NULL DEFAULT NOW(),
     expires_at         TIMESTAMP,
+    max_participants   INTEGER      NOT NULL DEFAULT 10,
     PRIMARY KEY (id),
     CONSTRAINT fk_rooms_host FOREIGN KEY (host_id) REFERENCES users (id)
 );
@@ -118,11 +119,27 @@ CREATE TABLE places (
     address       VARCHAR(500),
     lat           DOUBLE PRECISION NOT NULL,
     lng           DOUBLE PRECISION NOT NULL,
+    category      VARCHAR(20),
     registered_by UUID             NOT NULL,
     created_at    TIMESTAMP        NOT NULL DEFAULT NOW(),
     PRIMARY KEY (id),
     CONSTRAINT fk_pl_room FOREIGN KEY (room_id)       REFERENCES rooms (id) ON DELETE CASCADE,
     CONSTRAINT fk_pl_user FOREIGN KEY (registered_by) REFERENCES users (id)
+);
+
+
+-- ============================================================
+-- 6-1. place_likes  — 후보 장소 좋아요
+-- ============================================================
+CREATE TABLE place_likes (
+    id         UUID      NOT NULL,
+    place_id   UUID      NOT NULL,
+    user_id    UUID      NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (id),
+    CONSTRAINT uq_place_likes        UNIQUE (place_id, user_id),
+    CONSTRAINT fk_pl_likes_place FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE CASCADE,
+    CONSTRAINT fk_pl_likes_user  FOREIGN KEY (user_id)  REFERENCES users  (id) ON DELETE CASCADE
 );
 
 -- rooms.confirmed_place_id FK — 순환 참조이므로 places 생성 후 추가
