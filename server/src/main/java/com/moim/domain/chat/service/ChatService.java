@@ -38,7 +38,8 @@ public class ChatService {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        ChatMessage msg = chatMessageRepository.save(ChatMessage.builder()
+        // saveAndFlush로 즉시 INSERT를 실행해 @CreationTimestamp(sentAt)가 채워진 값을 즉시 응답에 반영
+        ChatMessage msg = chatMessageRepository.saveAndFlush(ChatMessage.builder()
             .room(room).user(user).content(request.getContent()).build());
 
         return ChatMessageResponse.from(msg);
