@@ -25,6 +25,10 @@ const useLocationStore = create((set) => ({
           : p
       ),
     })),
+  updatePlace: (place) =>
+    set((state) => ({
+      candidates: state.candidates.map((p) => (p.id === place.id ? { ...p, ...place } : p)),
+    })),
   setTravelTimes: (placeId, times) =>
     set((state) => ({ travelTimes: { ...state.travelTimes, [placeId]: times } })),
   setConfirmedPlace: (place) => set({ confirmedPlace: place }),

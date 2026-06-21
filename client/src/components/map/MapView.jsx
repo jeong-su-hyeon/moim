@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import useNaverMap from '../../hooks/useNaverMap.js';
 import useLocationStore from '../../stores/useLocationStore.js';
 import useRoomStore from '../../stores/useRoomStore.js';
-import { registerPlace, deletePlace, getPlaces, searchPlaces, togglePlaceLike } from '../../services/locationService.js';
+import { registerPlace, deletePlace, getPlaces, searchPlaces, togglePlaceLike, updatePlaceCategory } from '../../services/locationService.js';
 import useAuthStore from '../../stores/useAuthStore.js';
 import CategoryModal from './CategoryModal.jsx';
 import styles from './MapView.module.css';
@@ -14,7 +14,7 @@ const CATEGORIES = [
 ];
 
 export default function MapView({ roomId }) {
-  const { candidates, setCandidates, addCandidate, removeCandidate, updatePlaceLike } = useLocationStore();
+  const { candidates, setCandidates, addCandidate, removeCandidate, updatePlaceLike, updatePlace } = useLocationStore();
   const currentUserId = useAuthStore((s) => s.user?.id);
   const { participants } = useRoomStore();
   const [activePlace, setActivePlace] = useState(null);
@@ -28,6 +28,9 @@ export default function MapView({ roomId }) {
   const geoRef = useRef(null);
   const initialViewSet = useRef(false);
   const [placesLoaded, setPlacesLoaded] = useState(false);
+  const [sortBy, setSortBy] = useState('created');
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragOverCategory, setDragOverCategory] = useState(null);
   const markerMapRef = useRef({});
   const searchContainerRef = useRef(null);
 
@@ -158,6 +161,44 @@ export default function MapView({ roomId }) {
     }
   };
 
+  const handleDragStart = (e, place) => {
+    if (e.dataTransfer) {
+      e.dataTransfer.setData('text/plain', place.id);
+      e.dataTransfer.effectAllowed = 'move';
+    }
+    setDraggingId(place.id);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    setDragOverCategory(null);
+  };
+
+  const handleCategoryDragOver = (e, category) => {
+    e.preventDefault();
+    setDragOverCategory(category);
+  };
+
+  const handleCategoryDrop = async (e, category) => {
+    e.preventDefault();
+    const placeId = e.dataTransfer?.getData('text/plain') || draggingId;
+    setDraggingId(null);
+    setDragOverCategory(null);
+    if (!placeId) return;
+    const place = candidates.find((p) => p.id === placeId);
+    if (!place || place.category === category) return;
+
+    const prevCategory = place.category;
+    updatePlace({ ...place, category });
+    try {
+      const res = await updatePlaceCategory(roomId, placeId, category);
+      updatePlace(res.data.data);
+    } catch (err) {
+      console.error('[handleCategoryDrop] failed:', err?.response?.status, err?.response?.data);
+      updatePlace({ ...place, category: prevCategory });
+    }
+  };
+
   const handleRemove = async (place) => {
     try {
       await deletePlace(roomId, place.id);
@@ -235,26 +276,47 @@ export default function MapView({ roomId }) {
 
           {/* 후보지 목록 (카테고리별 세로 구분) */}
           <div className={styles.candidateList}>
-            <h3 className={styles.candidateTitle}>
-              후보 장소
-              {saving && <span className={styles.savingDot}> 저장 중...</span>}
-            </h3>
+            <div className={styles.candidateTitleRow}>
+              <h3 className={styles.candidateTitle}>
+                후보 장소
+                {saving && <span className={styles.savingDot}> 저장 중...</span>}
+              </h3>
+              <select
+                className={styles.sortSelect}
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="created">등록순</option>
+                <option value="like">좋아요순</option>
+              </select>
+            </div>
             {CATEGORIES.map(({ value, label, emoji }) => {
-              const list = candidates.filter((p) => p.category === value);
+              const baseList = candidates.filter((p) => p.category === value);
+              const list = sortBy === 'like'
+                ? [...baseList].sort((a, b) => (b.likeCount ?? 0) - (a.likeCount ?? 0))
+                : baseList;
               return (
                 <div key={value} className={styles.categorySection}>
                   <div className={styles.categoryHeader}>
                     <span>{emoji}</span>
                     <span>{label}</span>
                   </div>
-                  <div className={styles.categoryItems}>
+                  <div
+                    className={`${styles.categoryItems} ${dragOverCategory === value ? styles.categoryItemsDragOver : ''}`}
+                    onDragOver={(e) => handleCategoryDragOver(e, value)}
+                    onDragLeave={() => setDragOverCategory((c) => (c === value ? null : c))}
+                    onDrop={(e) => handleCategoryDrop(e, value)}
+                  >
                   {list.length === 0 ? (
                     <p className={styles.emptyMsg}>우리 {label}도 하나 골라야해!</p>
                   ) : (
                     list.map((place) => (
                       <div
                         key={place.id}
-                        className={`${styles.candidateItem} ${activePlace?.id === place.id ? styles.candidateItemActive : ''}`}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, place)}
+                        onDragEnd={handleDragEnd}
+                        className={`${styles.candidateItem} ${activePlace?.id === place.id ? styles.candidateItemActive : ''} ${draggingId === place.id ? styles.candidateItemDragging : ''}`}
                       >
                         {place.registeredBy === currentUserId && (
                           <button

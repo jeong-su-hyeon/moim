@@ -74,6 +74,15 @@ public class LocationController {
         return ResponseEntity.ok(ApiResponse.ok());
     }
 
+    @PatchMapping("/places/{placeId}/category")
+    public ResponseEntity<ApiResponse<PlaceResponse>> updatePlaceCategory(
+            @PathVariable UUID roomId,
+            @PathVariable UUID placeId,
+            @Valid @RequestBody PlaceCategoryRequest request,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.ok(locationService.updatePlaceCategory(roomId, placeId, request, user)));
+    }
+
     @PostMapping("/places/{placeId}/like")
     public ResponseEntity<ApiResponse<LikeUpdateMessage>> toggleLike(
             @PathVariable UUID roomId,
