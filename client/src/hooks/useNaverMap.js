@@ -30,9 +30,9 @@ function uid() {
 function pinContent(placeName, username, labelId, userLabelId) {
   const gap = PIN_W / 2 + 5; // 핀 가장자리에서 라벨까지 여백(px)
   return `
-    <div style="position:relative;width:0;height:0;pointer-events:none;cursor:pointer">
+    <div style="position:relative;width:0;height:0;pointer-events:none">
       <svg
-        style="position:absolute;left:${-PIN_W / 2}px;top:${-PIN_H}px"
+        style="position:absolute;left:${-PIN_W / 2}px;top:${-PIN_H}px;pointer-events:none"
         width="${PIN_W}" height="${PIN_H}" viewBox="0 0 24 34"
         xmlns="http://www.w3.org/2000/svg">
         <path
@@ -54,15 +54,12 @@ function pinContent(placeName, username, labelId, userLabelId) {
   `;
 }
 
-export default function useNaverMap({ onMapClick } = {}) {
+export default function useNaverMap() {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   // { marker, lat, lng, labelId, userLabelId }[]
   const metaRef = useRef([]);
-  const onMapClickRef = useRef(onMapClick);
   const [mapReady, setMapReady] = useState(false);
-
-  useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
 
   const syncLabels = () => {
     const map = mapRef.current;
@@ -105,34 +102,7 @@ export default function useNaverMap({ onMapClick } = {}) {
         zoom: 13,
       });
 
-      window.naver.maps.Event.addListener(mapRef.current, 'click', (e) => {
-        const lat = e.coord.lat();
-        const lng = e.coord.lng();
-
-        window.naver.maps.Service.reverseGeocode(
-          { coords: new window.naver.maps.LatLng(lat, lng), orders: 'roadaddr,addr' },
-          (status, response) => {
-            let address = '주소 없음';
-            if (status === window.naver.maps.Service.Status.OK) {
-              const items = response.v2?.results ?? [];
-              const road = items.find((r) => r.name === 'roadaddr');
-              const addr = items.find((r) => r.name === 'addr');
-              const found = road ?? addr;
-              if (found) {
-                const r = found.region;
-                const land = found.land;
-                address = [
-                  r?.area1?.name, r?.area2?.name, r?.area3?.name,
-                  land?.type === '1' ? land?.name : null,
-                  land?.number1 ? `${land.number1}${land.number2 ? `-${land.number2}` : ''}` : null,
-                ].filter(Boolean).join(' ');
-              }
-            }
-            onMapClickRef.current?.(lat, lng, address);
-          }
-        );
-      });
-
+      // 장소 등록은 검색 결과 선택을 통해서만 이루어진다 (지도 클릭으로는 등록하지 않음)
       window.naver.maps.Event.addListener(mapRef.current, 'zoom_changed', syncLabels);
 
       setMapReady(true);
@@ -160,9 +130,11 @@ export default function useNaverMap({ onMapClick } = {}) {
     if (!mapRef.current || !window.naver?.maps) return null;
     const labelId = uid();
     const userLabelId = uid();
+    // 순수 표시용 마커: 클릭 등 어떤 이벤트도 받지 않음 (clickable: false)
     const marker = new window.naver.maps.Marker({
       position: new window.naver.maps.LatLng(lat, lng),
       map: mapRef.current,
+      clickable: false,
       icon: {
         content: pinContent(label, username, labelId, userLabelId),
         // anchor = 핀 꼭짓점(tip): content div의 (0,0)이 좌표와 일치
