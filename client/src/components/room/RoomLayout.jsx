@@ -26,7 +26,7 @@ export default function RoomLayout({ room }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const { setAggregated, aggregated } = useScheduleStore();
-  const { updatePlaceLike, addCandidate, removeCandidate } = useLocationStore();
+  const { updatePlaceLike, addCandidate, removeCandidate, updatePlace } = useLocationStore();
   const { setRoom, setParticipants } = useRoomStore();
   const { user } = useAuthStore();
   const navigate = useNavigate();
@@ -80,7 +80,8 @@ export default function RoomLayout({ room }) {
   const onPlaceUpdate = useCallback((data) => {
     if (data.type === 'ADD') addCandidate(data.place);
     else if (data.type === 'DELETE') removeCandidate(data.placeId);
-  }, [addCandidate, removeCandidate]);
+    else if (data.type === 'UPDATE') updatePlace(data.place);
+  }, [addCandidate, removeCandidate, updatePlace]);
 
   const { sendMessage, loadMore } = useWebSocket(room?.id, {
     onScheduleUpdate,

@@ -107,6 +107,33 @@ public class LocationService {
             PlaceUpdateMessage.delete(placeId));
     }
 
+    @Transactional
+    public PlaceResponse updatePlaceCategory(UUID roomId, UUID placeId, PlaceCategoryRequest request, User user) {
+        roomService.validateParticipant(roomId, user.getId());
+
+        // IDOR 방지: place가 이 room 소속인지 한 쿼리로 검증
+        Place place = placeRepository.findByIdAndRoomId(placeId, roomId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.PLACE_NOT_FOUND));
+
+        // 등록자 또는 방장만 카테고리 변경 가능
+        boolean isRegistrant = place.getRegisteredBy().getId().equals(user.getId());
+        boolean isHost = place.getRoom().isHost(user.getId());
+        if (!isRegistrant && !isHost) {
+            throw new BusinessException(ErrorCode.ROOM_ACCESS_DENIED);
+        }
+
+        place.updateCategory(request.getCategory());
+
+        PlaceResponse response = PlaceResponse.from(
+            place,
+            placeLikeRepository.countByPlaceId(place.getId()),
+            placeLikeRepository.existsByPlaceIdAndUserId(place.getId(), user.getId())
+        );
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/places",
+            PlaceUpdateMessage.update(response));
+        return response;
+    }
+
     @Transactional(readOnly = true)
     public List<PlaceResponse> getPlaces(UUID roomId, User user) {
         roomService.validateParticipant(roomId, user.getId());

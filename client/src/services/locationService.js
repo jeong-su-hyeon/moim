@@ -27,3 +27,6 @@ export const getTravelTimes = (roomId, placeId, transport) =>
 
 export const togglePlaceLike = (roomId, placeId) =>
   api.post(`/rooms/${roomId}/places/${placeId}/like`);
+
+export const updatePlaceCategory = (roomId, placeId, category) =>
+  api.patch(`/rooms/${roomId}/places/${placeId}/category`, { category });

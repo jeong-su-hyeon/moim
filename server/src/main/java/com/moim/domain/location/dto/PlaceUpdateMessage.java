@@ -8,7 +8,7 @@ import java.util.UUID;
 @Getter
 @AllArgsConstructor
 public class PlaceUpdateMessage {
-    private String type; // "ADD" | "DELETE"
+    private String type; // "ADD" | "DELETE" | "UPDATE"
     private PlaceResponse place;
     private UUID placeId;
 
@@ -18,5 +18,9 @@ public class PlaceUpdateMessage {
 
     public static PlaceUpdateMessage delete(UUID placeId) {
         return new PlaceUpdateMessage("DELETE", null, placeId);
+    }
+
+    public static PlaceUpdateMessage update(PlaceResponse place) {
+        return new PlaceUpdateMessage("UPDATE", place, null);
     }
 }
