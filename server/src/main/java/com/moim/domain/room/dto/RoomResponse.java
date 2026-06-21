@@ -23,6 +23,7 @@ public class RoomResponse {
     private LocalDate confirmedDate;
     private ConfirmedPlaceInfo confirmedPlace;
     private int participantCount;
+    private int maxParticipants;
     private List<ParticipantInfo> participants;
     private LocalDateTime createdAt;
 
@@ -37,6 +38,7 @@ public class RoomResponse {
             .confirmedDate(room.getConfirmedDate())
             .confirmedPlace(place != null ? ConfirmedPlaceInfo.from(place) : null)
             .participantCount(room.getParticipantCount())
+            .maxParticipants(room.getMaxParticipants())
             .participants(room.getParticipants().stream()
                 .map(p -> new ParticipantInfo(p.getUser().getId(), p.getUser().getName()))
                 .toList())

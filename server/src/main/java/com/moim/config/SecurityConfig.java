@@ -43,13 +43,15 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // 인증 없이 접근 가능한 경로만 명시적으로 열기 (기본 닫힘 원칙)
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/oauth2/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/rooms/{roomId}").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2Login(oauth -> oauth
-                .authorizationEndpoint(ep ->
-                    ep.authorizationRequestRepository(cookieOAuth2RequestRepository))
+                .authorizationEndpoint(ep -> ep
+                    .baseUri("/api/oauth2/authorize")
+                    .authorizationRequestRepository(cookieOAuth2RequestRepository))
                 .userInfoEndpoint(ui ->
                     ui.userService(customOAuth2UserService))
                 .successHandler(oAuth2SuccessHandler)

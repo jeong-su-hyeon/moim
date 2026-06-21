@@ -41,7 +41,7 @@ export default function Room() {
         useRoomStore.getState().setParticipants(roomData.participants ?? []);
       } catch (err) {
         const code = err.response?.data?.error?.code;
-        if (code === 'ROOM_FULL') setError('방 인원이 가득 찼습니다. (최대 10명)');
+        if (code === 'ROOM_FULL') setError(`방 인원이 가득 찼습니다. (최대 ${room?.maxParticipants ?? 10}명)`);
         else if (code === 'ROOM_ALREADY_JOINED') setError('이미 참여 중인 방입니다.');
         else setError('참가에 실패했습니다. 다시 시도해주세요.');
       } finally {
@@ -55,7 +55,7 @@ export default function Room() {
           <p className={styles.joinLabel}>약속방 초대</p>
           <h2 className={styles.joinTitle}>{room.title}</h2>
           <p className={styles.joinMeta}>
-            방장: {room.hostName} · 현재 {room.participantCount}명 참여 중
+            방장: {room.hostName} · {room.participantCount} / {room.maxParticipants ?? 10}명 참여 중
           </p>
           {error && <p className={styles.joinError}>{error}</p>}
           <div className={styles.joinActions}>
