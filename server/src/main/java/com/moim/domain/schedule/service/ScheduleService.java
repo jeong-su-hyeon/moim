@@ -1,8 +1,11 @@
 package com.moim.domain.schedule.service;
 
 import com.moim.domain.room.entity.Room;
+import com.moim.domain.room.entity.RoomParticipant;
+import com.moim.domain.room.repository.RoomParticipantRepository;
 import com.moim.domain.room.repository.RoomRepository;
 import com.moim.domain.room.service.RoomService;
+import com.moim.domain.schedule.dto.ParticipantSummary;
 import com.moim.domain.schedule.dto.ScheduleRequest;
 import com.moim.domain.schedule.entity.Schedule;
 import com.moim.domain.schedule.repository.ScheduleRepository;
@@ -26,6 +29,7 @@ public class ScheduleService {
 
     private final ScheduleRepository scheduleRepository;
     private final RoomRepository roomRepository;
+    private final RoomParticipantRepository roomParticipantRepository;
     private final RoomService roomService;
     private final SimpMessagingTemplate messagingTemplate;
 
@@ -46,7 +50,7 @@ public class ScheduleService {
         scheduleRepository.saveAll(schedules);
 
         // 집계 결과를 방 참여자 전원에게 브로드캐스트
-        Map<LocalDate, List<String>> aggregated = getAggregated(roomId, user);
+        Map<LocalDate, List<ParticipantSummary>> aggregated = getAggregated(roomId, user);
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/schedule", aggregated);
     }
 
@@ -59,13 +63,22 @@ public class ScheduleService {
     }
 
     @Transactional(readOnly = true)
-    public Map<LocalDate, List<String>> getAggregated(UUID roomId, User user) {
+    public Map<LocalDate, List<ParticipantSummary>> getAggregated(UUID roomId, User user) {
         roomService.validateParticipant(roomId, user.getId());
+
+        Map<UUID, String> colorByUserId = roomParticipantRepository.findByIdRoomId(roomId).stream()
+            .collect(Collectors.toMap(p -> p.getUser().getId(), RoomParticipant::getColor));
 
         return scheduleRepository.findByRoomId(roomId).stream()
             .collect(Collectors.groupingBy(
                 Schedule::getAvailableDate,
-                Collectors.mapping(s -> s.getUser().getName(), Collectors.toList())
+                Collectors.mapping(
+                    s -> new ParticipantSummary(
+                        s.getUser().getId(),
+                        s.getUser().getName(),
+                        colorByUserId.get(s.getUser().getId())
+                    ),
+                    Collectors.toList())
             ));
     }
 }

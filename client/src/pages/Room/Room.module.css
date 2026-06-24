@@ -52,6 +52,22 @@
   margin: 0;
 }
 
+.joinColorSection {
+  width: 100%;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.joinColorLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+  margin: 0;
+}
+
 .joinError {
   font-size: 13px;
   color: #e53935;

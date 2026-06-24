@@ -4,6 +4,8 @@ import com.moim.domain.location.dto.*;
 import com.moim.domain.location.entity.*;
 import com.moim.domain.location.repository.*;
 import com.moim.domain.room.entity.Room;
+import com.moim.domain.room.entity.RoomParticipant;
+import com.moim.domain.room.repository.RoomParticipantRepository;
 import com.moim.domain.room.repository.RoomRepository;
 import com.moim.domain.room.service.RoomService;
 import com.moim.domain.user.entity.User;
@@ -18,8 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -31,9 +35,15 @@ public class LocationService {
     private final TravelTimeRepository travelTimeRepository;
     private final PlaceLikeRepository placeLikeRepository;
     private final RoomRepository roomRepository;
+    private final RoomParticipantRepository roomParticipantRepository;
     private final RoomService roomService;
     private final NaverDirectionsClient naverDirectionsClient;
     private final SimpMessagingTemplate messagingTemplate;
+
+    private Map<UUID, String> colorByUserId(UUID roomId) {
+        return roomParticipantRepository.findByIdRoomId(roomId).stream()
+            .collect(Collectors.toMap(p -> p.getUser().getId(), RoomParticipant::getColor));
+    }
 
     @Transactional
     public void saveOrigin(UUID roomId, OriginRequest request, User user) {
@@ -79,7 +89,7 @@ public class LocationService {
             .registeredBy(user)
             .build());
 
-        PlaceResponse response = PlaceResponse.from(place, 0L, false);
+        PlaceResponse response = PlaceResponse.from(place, 0L, false, colorByUserId(roomId).get(user.getId()));
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/places",
             PlaceUpdateMessage.add(response));
         return response;
@@ -127,7 +137,8 @@ public class LocationService {
         PlaceResponse response = PlaceResponse.from(
             place,
             placeLikeRepository.countByPlaceId(place.getId()),
-            placeLikeRepository.existsByPlaceIdAndUserId(place.getId(), user.getId())
+            placeLikeRepository.existsByPlaceIdAndUserId(place.getId(), user.getId()),
+            colorByUserId(roomId).get(place.getRegisteredBy().getId())
         );
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/places",
             PlaceUpdateMessage.update(response));
@@ -137,11 +148,13 @@ public class LocationService {
     @Transactional(readOnly = true)
     public List<PlaceResponse> getPlaces(UUID roomId, User user) {
         roomService.validateParticipant(roomId, user.getId());
+        Map<UUID, String> colorByUserId = colorByUserId(roomId);
         return placeRepository.findByRoomId(roomId).stream()
             .map(p -> PlaceResponse.from(
                 p,
                 placeLikeRepository.countByPlaceId(p.getId()),
-                placeLikeRepository.existsByPlaceIdAndUserId(p.getId(), user.getId())
+                placeLikeRepository.existsByPlaceIdAndUserId(p.getId(), user.getId()),
+                colorByUserId.get(p.getRegisteredBy().getId())
             ))
             .toList();
     }

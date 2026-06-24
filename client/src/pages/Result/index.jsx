@@ -4,6 +4,7 @@ import api from '../../services/api.js';
 import useAuthStore from '../../stores/useAuthStore.js';
 import { confirmRoom } from '../../services/roomService.js';
 import { getAggregatedSchedules } from '../../services/scheduleService.js';
+import { colorHex } from '../../constants/index.js';
 import styles from './Result.module.css';
 
 export default function Result() {
@@ -136,7 +137,10 @@ export default function Result() {
               <h3 className={styles.cardTitle}>참여자</h3>
               <ul className={styles.participantList}>
                 {(result.participants ?? []).map((p) => (
-                  <li key={p.id}>{p.name}</li>
+                  <li key={p.id} className={styles.participantItem}>
+                    <span className={styles.miniDot} style={{ background: colorHex(p.color) }} />
+                    {p.name}
+                  </li>
                 ))}
               </ul>
             </section>

@@ -41,6 +41,7 @@ COMMENT ON COLUMN rooms.max_participants   IS '최대 참여 인원 (1~10명). �
 COMMENT ON TABLE  room_participants           IS '약속방 참여자 매핑. (room_id, user_id) 복합 PK로 중복 참가를 방지한다.';
 COMMENT ON COLUMN room_participants.room_id   IS 'PK(복합) + FK → rooms.id';
 COMMENT ON COLUMN room_participants.user_id   IS 'PK(복합) + FK → users.id';
+COMMENT ON COLUMN room_participants.color     IS '참여자 고유 색상 키 (RED, ORANGE 등 10종). 방 내에서 중복 불가';
 COMMENT ON COLUMN room_participants.joined_at IS '방 참가 일시';
 
 

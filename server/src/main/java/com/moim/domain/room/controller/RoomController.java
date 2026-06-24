@@ -1,6 +1,7 @@
 package com.moim.domain.room.controller;
 
 import com.moim.domain.room.dto.ConfirmRequest;
+import com.moim.domain.room.dto.JoinRoomRequest;
 import com.moim.domain.room.dto.RoomCreateRequest;
 import com.moim.domain.room.dto.RoomResponse;
 import com.moim.domain.room.dto.RoomUpdateRequest;
@@ -46,8 +47,9 @@ public class RoomController {
     @PostMapping("/{roomId}/join")
     public ResponseEntity<ApiResponse<Void>> joinRoom(
             @PathVariable UUID roomId,
+            @Valid @RequestBody JoinRoomRequest request,
             @AuthenticationPrincipal User user) {
-        roomService.joinRoom(roomId, user);
+        roomService.joinRoom(roomId, request, user);
         return ResponseEntity.ok(ApiResponse.ok());
     }
 

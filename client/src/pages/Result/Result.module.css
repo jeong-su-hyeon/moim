@@ -76,6 +76,20 @@
   font-size: 14px;
 }
 
+.participantItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.miniDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
 /* 날짜 카드 헤더 (수정 버튼 포함) */
 .cardHeader {
   display: flex;

@@ -642,13 +642,32 @@
 .resultAllNames {
   font-size: 12px;
   color: #666;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .resultNames {
-  display: block;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   font-size: 12px;
   color: #666;
   margin-top: 2px;
+}
+
+.resultNamesItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.miniDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
 }
 
 .resultRadio {

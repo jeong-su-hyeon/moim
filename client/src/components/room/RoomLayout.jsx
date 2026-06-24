@@ -12,6 +12,7 @@ import useAuthStore from '../../stores/useAuthStore.js';
 import useLocationStore from '../../stores/useLocationStore.js';
 import { getAggregatedSchedules } from '../../services/scheduleService.js';
 import { confirmRoom, unconfirmRoom, updateRoom, deleteRoom, leaveRoom } from '../../services/roomService.js';
+import { colorHex } from '../../constants/index.js';
 import styles from './RoomLayout.module.css';
 
 const NAV_ITEMS = [
@@ -185,7 +186,7 @@ function ParticipantsModal({ room, onClose }) {
           <ul className={styles.participantList}>
             {participants.map((p) => (
               <li key={p.id} className={styles.participantItem}>
-                <div className={styles.participantAvatar}>
+                <div className={styles.participantAvatar} style={{ backgroundColor: colorHex(p.color), color: '#fff' }}>
                   {p.name?.charAt(0)}
                 </div>
                 <span className={styles.participantName}>
@@ -428,8 +429,8 @@ function ResultView({ room, aggregated }) {
   const [toast, setToast] = useState(null);
 
   const entries = Object.entries(aggregated ?? {});
-  const getNames = (val) => (Array.isArray(val) ? val : []);
-  const getCount = (val) => getNames(val).length;
+  const getParticipants = (val) => (Array.isArray(val) ? val : []);
+  const getCount = (val) => getParticipants(val).length;
 
   let topDate = null;
   let maxCount = 0;
@@ -497,7 +498,14 @@ function ResultView({ room, aggregated }) {
                   ? `${totalCount}명 중 ${maxCount}명 가능`
                   : `${maxCount}명 가능`}
               </p>
-              <p className={styles.resultNames}>{getNames(aggregated[topDate]).join(', ')}</p>
+              <p className={styles.resultNames}>
+                {getParticipants(aggregated[topDate]).map((p) => (
+                  <span key={p.id} className={styles.resultNamesItem}>
+                    <span className={styles.miniDot} style={{ background: colorHex(p.color) }} />
+                    {p.name}
+                  </span>
+                ))}
+              </p>
             </div>
           )}
 
@@ -529,7 +537,14 @@ function ResultView({ room, aggregated }) {
                     )}
                     <span className={styles.resultAllDate}>{formatDate(date)}</span>
                     <span className={styles.resultAllRight}>
-                      <span className={styles.resultAllNames}>{getNames(val).join(', ')}</span>
+                      <span className={styles.resultAllNames}>
+                        {getParticipants(val).map((p) => (
+                          <span key={p.id} className={styles.resultNamesItem}>
+                            <span className={styles.miniDot} style={{ background: colorHex(p.color) }} />
+                            {p.name}
+                          </span>
+                        ))}
+                      </span>
                       <span className={styles.resultAllCount}>{getCount(val)}명</span>
                       {isConfirmedDate && <span className={styles.confirmedBadge}>확정</span>}
                     </span>

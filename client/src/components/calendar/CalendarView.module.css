@@ -110,13 +110,20 @@
   font-weight: 600;
 }
 
-.nameList {
-  font-size: 9px;
-  color: #555;
-  text-align: center;
-  line-height: 1.3;
-  word-break: break-all;
+.dotRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
   padding: 0 2px;
+  max-width: 100%;
+}
+
+.miniDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
 }
 
 .footer {

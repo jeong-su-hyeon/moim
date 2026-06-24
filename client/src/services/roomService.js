@@ -6,12 +6,12 @@ import api from './api.js';
 
 export const getMyRooms = () => api.get('/rooms');
 
-export const createRoom = (title, maxParticipants) =>
-  api.post('/rooms', { title, maxParticipants });
+export const createRoom = (title, maxParticipants, color) =>
+  api.post('/rooms', { title, maxParticipants, color });
 
 export const getRoom = (roomId) => api.get(`/rooms/${roomId}`);
 
-export const joinRoom = (roomId) => api.post(`/rooms/${roomId}/join`);
+export const joinRoom = (roomId, color) => api.post(`/rooms/${roomId}/join`, { color });
 
 export const updateRoom = (roomId, { title, maxParticipants } = {}) =>
   api.patch(`/rooms/${roomId}`, { title, maxParticipants });
