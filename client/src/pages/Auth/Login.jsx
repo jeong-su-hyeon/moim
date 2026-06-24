@@ -81,8 +81,8 @@ export default function Login() {
           <a className={`${styles.socialBtn} ${styles.google}`} href={`${apiBase}/oauth2/authorize/google`}>
             Google로 계속하기
           </a>
-          <a className={`${styles.socialBtn} ${styles.kakao}`} href={`${apiBase}/oauth2/authorize/kakao`}>
-            카카오로 계속하기
+          <a className={`${styles.socialBtn} ${styles.naver}`} href={`${apiBase}/oauth2/authorize/naver`}>
+            네이버로 계속하기
           </a>
         </div>
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import useNaverMap from '../../hooks/useNaverMap.js';
 import useLocationStore from '../../stores/useLocationStore.js';
 import useRoomStore from '../../stores/useRoomStore.js';
-import { registerPlace, deletePlace, getPlaces, searchPlaces, togglePlaceLike, updatePlaceCategory } from '../../services/locationService.js';
+import { registerPlace, deletePlace, getPlaces, searchPlaces, togglePlaceLike, updatePlaceCategory, getTravelTimes } from '../../services/locationService.js';
 import useAuthStore from '../../stores/useAuthStore.js';
 import CategoryModal from './CategoryModal.jsx';
 import { colorHex } from '../../constants/index.js';
@@ -14,12 +14,14 @@ const CATEGORIES = [
   { value: 'ACTIVITY',   label: '놀거리', emoji: '🎉' },
 ];
 
+const CATEGORY_FILTERS = [{ value: 'ALL', label: '전체', emoji: '🗂️' }, ...CATEGORIES];
+
 export default function MapView({ roomId }) {
-  const { candidates, setCandidates, addCandidate, removeCandidate, updatePlaceLike, updatePlace } = useLocationStore();
+  const { candidates, setCandidates, addCandidate, removeCandidate, updatePlaceLike, updatePlace, travelTimes, setTravelTimes } = useLocationStore();
   const currentUserId = useAuthStore((s) => s.user?.id);
   const { participants } = useRoomStore();
   const [activePlace, setActivePlace] = useState(null);
-  const [transport, setTransport] = useState('TRANSIT');
+  const [transport, setTransport] = useState('CAR'); // 백엔드가 현재 CAR(자동차)만 실제 계산 지원
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -32,6 +34,8 @@ export default function MapView({ roomId }) {
   const [sortBy, setSortBy] = useState('created');
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverCategory, setDragOverCategory] = useState(null);
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [loadingTravel, setLoadingTravel] = useState(false);
   const markerMapRef = useRef({});
   const searchContainerRef = useRef(null);
 
@@ -85,24 +89,37 @@ export default function MapView({ roomId }) {
 
   useEffect(() => {
     if (!mapReady) return;
-    const candidateIds = new Set(candidates.map((p) => p.id));
+    const visiblePlaces = categoryFilter === 'ALL'
+      ? candidates
+      : candidates.filter((p) => p.category === categoryFilter);
+    const visibleIds = new Set(visiblePlaces.map((p) => p.id));
 
-    // candidates에서 빠진(삭제되었거나 더 이상 유효하지 않은) 마커는 지도에서 제거
+    // 필터에서 제외되었거나 삭제된 장소의 마커는 지도에서 제거
     Object.keys(markerMapRef.current).forEach((id) => {
-      if (!candidateIds.has(id)) {
+      if (!visibleIds.has(id)) {
         removeMarker(markerMapRef.current[id]);
         delete markerMapRef.current[id];
       }
     });
 
-    // candidates에 새로 추가된 장소만 마커로 표시
-    candidates.forEach((place) => {
+    // 필터에 새로 포함된 장소만 마커로 표시
+    visiblePlaces.forEach((place) => {
       if (!markerMapRef.current[place.id]) {
         const m = addMarker(place.lat, place.lng, place.name, colorHex(place.registeredByColor));
         if (m) markerMapRef.current[place.id] = m;
       }
     });
-  }, [mapReady, candidates]);
+  }, [mapReady, candidates, categoryFilter]);
+
+  // 후보지 또는 이동수단 변경 시 참여자별 이동 시간 조회
+  useEffect(() => {
+    if (!activePlace || !roomId) return;
+    setLoadingTravel(true);
+    getTravelTimes(roomId, activePlace.id, transport)
+      .then((res) => setTravelTimes(activePlace.id, res.data.data ?? []))
+      .catch(() => setTravelTimes(activePlace.id, []))
+      .finally(() => setLoadingTravel(false));
+  }, [activePlace, transport, roomId]);
 
   const handleSearch = async () => {
     const query = searchQuery.trim();
@@ -291,7 +308,20 @@ export default function MapView({ roomId }) {
                 <option value="like">좋아요순</option>
               </select>
             </div>
-            {CATEGORIES.map(({ value, label, emoji }) => {
+
+            <div className={styles.categoryFilterRow}>
+              {CATEGORY_FILTERS.map(({ value, label, emoji }) => (
+                <button
+                  key={value}
+                  className={`${styles.categoryFilterChip} ${categoryFilter === value ? styles.categoryFilterChipActive : ''}`}
+                  onClick={() => setCategoryFilter(value)}
+                >
+                  {emoji} {label}
+                </button>
+              ))}
+            </div>
+
+            {CATEGORIES.filter(({ value }) => categoryFilter === 'ALL' || categoryFilter === value).map(({ value, label, emoji }) => {
               const baseList = candidates.filter((p) => p.category === value);
               const list = sortBy === 'like'
                 ? [...baseList].sort((a, b) => (b.likeCount ?? 0) - (a.likeCount ?? 0))
@@ -372,13 +402,21 @@ export default function MapView({ roomId }) {
             <div className={styles.travelList}>
               {participants.length === 0 ? (
                 <p className={styles.emptyMsg}>참여자 이동 시간 정보가 없습니다.</p>
+              ) : loadingTravel ? (
+                <p className={styles.emptyMsg}>조회 중...</p>
               ) : (
-                participants.map((p) => (
-                  <div key={p.id} className={styles.travelRow}>
-                    <span>{p.name}</span>
-                    <span className={styles.duration}>-</span>
-                  </div>
-                ))
+                participants.map((p) => {
+                  const result = (travelTimes[activePlace.id] ?? [])
+                    .find((t) => String(t.userId) === String(p.id));
+                  return (
+                    <div key={p.id} className={styles.travelRow}>
+                      <span>{p.name}</span>
+                      <span className={styles.duration}>
+                        {result ? `${result.durationMin}분` : '정보 없음'}
+                      </span>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

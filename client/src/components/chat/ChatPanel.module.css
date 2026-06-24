@@ -53,6 +53,13 @@
 .dotOff { background: #ccc; }
 
 /* ── 메시지 목록 ── */
+.messagesWrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
 .messages {
   flex: 1;
   overflow-y: auto;
@@ -61,6 +68,26 @@
   flex-direction: column;
   gap: 2px;
   background: #fff;
+}
+
+.unreadBadge {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a73e8;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.unreadBadge:hover {
+  background: #1558b0;
 }
 
 /* ── 날짜 구분선 ── */

@@ -115,14 +115,14 @@
   background: #e8f0fe;
 }
 
-.kakao {
-  border-color: #f9e000;
-  background: #f9e000;
-  color: #3c1e1e;
+.naver {
+  border-color: #03c75a;
+  background: #03c75a;
+  color: #fff;
 }
 
-.kakao:hover {
-  background: #e6d000;
+.naver:hover {
+  background: #02b350;
 }
 
 .footer {

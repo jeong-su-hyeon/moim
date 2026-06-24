@@ -37,11 +37,14 @@ export default function ChatPanel({ roomId, sendMessage, loadMore }) {
   const [input, setInput] = useState('');
   const [loadingMore, setLoadingMore] = useState(false);
   const [noMore, setNoMore] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const scrollRef = useRef(null);
   const bottomRef = useRef(null);
   const savedScrollHeight = useRef(0);
   const isPrepending = useRef(false);
+  const prevMessageCount = useRef(0);
+  const isAtBottomRef = useRef(true);
 
   const { messages, isConnected } = useChatStore();
   const user = useAuthStore((s) => s.user);
@@ -51,23 +54,42 @@ export default function ChatPanel({ roomId, sendMessage, loadMore }) {
   const todayLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 (${days[now.getDay()]})`;
   const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
 
-  // 새 메시지 → 하단 스크롤 / prepend → 위치 유지
+  // 새 메시지 → 하단 스크롤 / prepend → 위치 유지 / 스크롤 위쪽일 땐 안읽음 배지 증가
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+
+    const newCount = messages.length - prevMessageCount.current;
+    prevMessageCount.current = messages.length;
+
     if (isPrepending.current) {
       el.scrollTop = el.scrollHeight - savedScrollHeight.current;
       savedScrollHeight.current = 0;
       isPrepending.current = false;
-    } else {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      return;
     }
-  }, [messages]);
+
+    const lastMsg = messages[messages.length - 1];
+    const isOwnMessage = lastMsg && String(lastMsg.userId) === String(user?.id);
+
+    if (isAtBottomRef.current || isOwnMessage) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      setUnreadCount(0);
+    } else if (newCount > 0) {
+      setUnreadCount((c) => c + newCount);
+    }
+  }, [messages, user?.id]);
 
   const handleScroll = useCallback(async () => {
     const el = scrollRef.current;
-    if (!el || loadingMore || noMore || !loadMore) return;
-    if (el.scrollTop > 0) return;
+    if (!el) return;
+
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const atBottom = distanceFromBottom < 40;
+    isAtBottomRef.current = atBottom;
+    if (atBottom) setUnreadCount(0);
+
+    if (loadingMore || noMore || !loadMore || el.scrollTop > 0) return;
 
     setLoadingMore(true);
     savedScrollHeight.current = el.scrollHeight;
@@ -81,6 +103,11 @@ export default function ChatPanel({ roomId, sendMessage, loadMore }) {
   }, [loadingMore, noMore, loadMore]);
 
   useEffect(() => { setNoMore(false); }, [roomId]);
+
+  const scrollToBottom = () => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setUnreadCount(0);
+  };
 
   const handleSend = () => {
     const text = input.trim();
@@ -133,6 +160,7 @@ export default function ChatPanel({ roomId, sendMessage, loadMore }) {
         </div>
       </div>
 
+      <div className={styles.messagesWrap}>
       <div className={styles.messages} ref={scrollRef} onScroll={handleScroll}>
         {loadingMore && <div className={styles.statusMsg}>이전 메시지 불러오는 중...</div>}
         {noMore && messages.length > 0 && (
@@ -179,6 +207,13 @@ export default function ChatPanel({ roomId, sendMessage, loadMore }) {
           );
         })}
         <div ref={bottomRef} />
+      </div>
+
+      {unreadCount > 0 && (
+        <button className={styles.unreadBadge} onClick={scrollToBottom}>
+          새 메시지 {unreadCount}개 ↓
+        </button>
+      )}
       </div>
 
       <div className={styles.inputArea}>

@@ -10,11 +10,24 @@ const STATUS_LABEL = {
   CANCELLED: '취소',
 };
 
+const STATUS_FILTERS = [
+  { value: 'ALL', label: '전체' },
+  { value: 'ACTIVE', label: '진행 중' },
+  { value: 'CONFIRMED', label: '확정 완료' },
+];
+
+const SORT_OPTIONS = [
+  { value: 'recent', label: '최신순' },
+  { value: 'participants', label: '인원 많은순' },
+];
+
 export default function Home() {
   const { isAuthenticated, user, logout } = useAuthStore();
   const navigate = useNavigate();
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('recent');
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -42,6 +55,13 @@ export default function Home() {
     logout();
     navigate('/login');
   };
+
+  const visibleRooms = rooms
+    .filter((room) => statusFilter === 'ALL' || room.status === statusFilter)
+    .sort((a, b) => {
+      if (sortBy === 'participants') return b.participantCount - a.participantCount;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
 
   return (
     <div className={styles.page}>
@@ -96,24 +116,54 @@ export default function Home() {
               <Link className={styles.newRoomLink} to="/room/new">+ 새 방 만들기</Link>
             </div>
 
+            <div className={styles.roomControls}>
+              <div className={styles.statusFilters}>
+                {STATUS_FILTERS.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    className={`${styles.filterChip} ${statusFilter === value ? styles.filterChipActive : ''}`}
+                    onClick={() => setStatusFilter(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <select
+                className={styles.sortSelect}
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                {SORT_OPTIONS.map(({ value, label }) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+
             {loading ? (
               <p className={styles.empty}>불러오는 중...</p>
             ) : rooms.length === 0 ? (
               <p className={styles.empty}>아직 참여한 약속방이 없습니다.</p>
+            ) : visibleRooms.length === 0 ? (
+              <p className={styles.empty}>조건에 맞는 약속방이 없습니다.</p>
             ) : (
               <ul className={styles.roomList}>
-                {rooms.map((room) => (
+                {visibleRooms.map((room) => (
                   <li key={room.id}>
                     <Link className={styles.roomCard} to={`/room/${room.id}`}>
                       <div className={styles.roomCardLeft}>
-                        <span className={styles.roomTitle}>{room.title}</span>
+                        <div className={styles.roomTitleRow}>
+                          <span className={styles.roomTitle}>{room.title}</span>
+                          <span className={`${styles.statusBadge} ${styles[`status_${room.status}`]}`}>
+                            {STATUS_LABEL[room.status] ?? room.status}
+                          </span>
+                        </div>
                         <span className={styles.roomMeta}>
-                          {room.hostName} 외 {room.participantCount - 1}명
+                          {room.hostName} 외 {Math.max(room.participantCount - 1, 0)}명
                         </span>
                       </div>
                       <div className={styles.roomCardRight}>
-                        <span className={`${styles.statusBadge} ${styles[`status_${room.status}`]}`}>
-                          {STATUS_LABEL[room.status] ?? room.status}
+                        <span className={styles.participantBadge}>
+                          👥 {room.participantCount}/{room.maxParticipants}명
                         </span>
                         {room.confirmedDate && (
                           <span className={styles.confirmedDateBadge}>
