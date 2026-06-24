@@ -19,16 +19,13 @@ public class PlaceResponse {
     private Double lng;
     private UUID registeredBy;
     private String registeredByName;
+    private String registeredByColor;
     private LocalDateTime createdAt;
     private PlaceCategory category;
     private long likeCount;
     private boolean likedByMe;
 
-    public static PlaceResponse from(Place place) {
-        return from(place, 0L, false);
-    }
-
-    public static PlaceResponse from(Place place, long likeCount, boolean likedByMe) {
+    public static PlaceResponse from(Place place, long likeCount, boolean likedByMe, String registeredByColor) {
         return PlaceResponse.builder()
             .id(place.getId())
             .name(place.getName())
@@ -38,6 +35,7 @@ public class PlaceResponse {
             .category(place.getCategory())
             .registeredBy(place.getRegisteredBy().getId())
             .registeredByName(place.getRegisteredBy().getName())
+            .registeredByColor(registeredByColor)
             .createdAt(place.getCreatedAt())
             .likeCount(likeCount)
             .likedByMe(likedByMe)

@@ -68,9 +68,10 @@ CREATE TABLE rooms (
 -- 3. room_participants  (복합 PK)
 -- ============================================================
 CREATE TABLE room_participants (
-    room_id   UUID      NOT NULL,
-    user_id   UUID      NOT NULL,
-    joined_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    room_id   UUID         NOT NULL,
+    user_id   UUID         NOT NULL,
+    color     VARCHAR(10)  NOT NULL,
+    joined_at TIMESTAMP    NOT NULL DEFAULT NOW(),
     PRIMARY KEY (room_id, user_id),
     CONSTRAINT fk_rp_room FOREIGN KEY (room_id) REFERENCES rooms (id) ON DELETE CASCADE,
     CONSTRAINT fk_rp_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE

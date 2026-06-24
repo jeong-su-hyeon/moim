@@ -5,6 +5,7 @@ import useRoomStore from '../../stores/useRoomStore.js';
 import useAuthStore from '../../stores/useAuthStore.js';
 import { joinRoom, getRoom } from '../../services/roomService.js';
 import RoomLayout from '../../components/room/RoomLayout.jsx';
+import ColorPicker from '../../components/common/ColorPicker.jsx';
 import styles from './Room.module.css';
 
 export default function Room() {
@@ -16,6 +17,7 @@ export default function Room() {
   const { user, isAuthenticated } = useAuthStore();
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState(null);
+  const [color, setColor] = useState(null);
 
   if (!room || room.id !== roomId) {
     return <div className={styles.loading}>방 정보를 불러오는 중...</div>;
@@ -30,10 +32,11 @@ export default function Room() {
         navigate(`/login?redirect=/room/${roomId}`);
         return;
       }
+      if (!color) return;
       setJoining(true);
       setError(null);
       try {
-        await joinRoom(roomId);
+        await joinRoom(roomId, color);
         // 참가 완료 후 최신 방 데이터(참여자 포함)로 스토어 직접 갱신
         const roomRes = await getRoom(roomId);
         const roomData = roomRes.data.data;
@@ -43,7 +46,13 @@ export default function Room() {
         const code = err.response?.data?.error?.code;
         if (code === 'ROOM_FULL') setError(`방 인원이 가득 찼습니다. (최대 ${room?.maxParticipants ?? 10}명)`);
         else if (code === 'ROOM_ALREADY_JOINED') setError('이미 참여 중인 방입니다.');
-        else setError('참가에 실패했습니다. 다시 시도해주세요.');
+        else if (code === 'COLOR_ALREADY_TAKEN') {
+          setError('다른 참여자가 먼저 선택한 색상입니다. 다른 색상을 선택해주세요.');
+          setColor(null);
+          getRoom(roomId)
+            .then((res) => useRoomStore.getState().setRoom(res.data.data))
+            .catch(() => {});
+        } else setError('참가에 실패했습니다. 다시 시도해주세요.');
       } finally {
         setJoining(false);
       }
@@ -57,9 +66,17 @@ export default function Room() {
           <p className={styles.joinMeta}>
             방장: {room.hostName} · {room.participantCount} / {room.maxParticipants ?? 10}명 참여 중
           </p>
+          <div className={styles.joinColorSection}>
+            <p className={styles.joinColorLabel}>내 색상 선택</p>
+            <ColorPicker
+              value={color}
+              onChange={setColor}
+              disabledColors={(room.participants ?? []).map((p) => p.color)}
+            />
+          </div>
           {error && <p className={styles.joinError}>{error}</p>}
           <div className={styles.joinActions}>
-            <button className={styles.joinBtn} onClick={handleJoin} disabled={joining}>
+            <button className={styles.joinBtn} onClick={handleJoin} disabled={joining || !color}>
               {joining ? '참가 중...' : '이 방에 참가하기'}
             </button>
             <button className={styles.cancelBtn} onClick={() => navigate('/')}>

@@ -23,6 +23,8 @@ public enum ErrorCode {
     ROOM_ACCESS_DENIED(HttpStatus.FORBIDDEN, "약속방에 대한 권한이 없습니다."),
     HOST_ONLY(HttpStatus.FORBIDDEN, "방장만 수행할 수 있는 작업입니다."),
     ROOM_NOT_ACTIVE(HttpStatus.BAD_REQUEST, "활성 상태의 약속방이 아닙니다."),
+    COLOR_ALREADY_TAKEN(HttpStatus.CONFLICT, "이미 사용 중인 색상입니다."),
+    INVALID_COLOR(HttpStatus.BAD_REQUEST, "올바르지 않은 색상입니다."),
 
     // User
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),

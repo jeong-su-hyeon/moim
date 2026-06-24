@@ -5,6 +5,7 @@ import useRoomStore from '../../stores/useRoomStore.js';
 import { registerPlace, deletePlace, getPlaces, searchPlaces, togglePlaceLike, updatePlaceCategory } from '../../services/locationService.js';
 import useAuthStore from '../../stores/useAuthStore.js';
 import CategoryModal from './CategoryModal.jsx';
+import { colorHex } from '../../constants/index.js';
 import styles from './MapView.module.css';
 
 const CATEGORIES = [
@@ -97,7 +98,7 @@ export default function MapView({ roomId }) {
     // candidates에 새로 추가된 장소만 마커로 표시
     candidates.forEach((place) => {
       if (!markerMapRef.current[place.id]) {
-        const m = addMarker(place.lat, place.lng, place.name, place.registeredByName);
+        const m = addMarker(place.lat, place.lng, place.name, colorHex(place.registeredByColor));
         if (m) markerMapRef.current[place.id] = m;
       }
     });
@@ -136,7 +137,7 @@ export default function MapView({ roomId }) {
       const res = await registerPlace(roomId, result.name, result.address, result.lat, result.lng, category);
       const place = res.data.data;
       addCandidate(place);
-      const m = addMarker(place.lat, place.lng, place.name, place.registeredByName);
+      const m = addMarker(place.lat, place.lng, place.name, colorHex(place.registeredByColor));
       if (m) markerMapRef.current[place.id] = m;
     } catch {
     } finally {

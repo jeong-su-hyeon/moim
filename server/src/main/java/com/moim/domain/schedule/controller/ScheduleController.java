@@ -1,5 +1,6 @@
 package com.moim.domain.schedule.controller;
 
+import com.moim.domain.schedule.dto.ParticipantSummary;
 import com.moim.domain.schedule.dto.ScheduleRequest;
 import com.moim.domain.schedule.service.ScheduleService;
 import com.moim.domain.user.entity.User;
@@ -39,7 +40,7 @@ public class ScheduleController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Map<LocalDate, List<String>>>> getSchedules(
+    public ResponseEntity<ApiResponse<Map<LocalDate, List<ParticipantSummary>>>> getSchedules(
             @PathVariable UUID roomId,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ApiResponse.ok(scheduleService.getAggregated(roomId, user)));

@@ -3,6 +3,7 @@ package com.moim.domain.room.service;
 import com.moim.domain.location.entity.Place;
 import com.moim.domain.location.repository.PlaceRepository;
 import com.moim.domain.room.dto.ConfirmRequest;
+import com.moim.domain.room.dto.JoinRoomRequest;
 import com.moim.domain.room.dto.RoomCreateRequest;
 import com.moim.domain.room.dto.RoomResponse;
 import com.moim.domain.room.dto.RoomUpdateRequest;
@@ -33,6 +34,7 @@ public class RoomService {
 
     @Transactional
     public RoomResponse createRoom(RoomCreateRequest request, User host) {
+        String color = validateColor(request.getColor());
         int maxParticipants = request.getMaxParticipants() != null ? request.getMaxParticipants() : MAX_PARTICIPANTS;
         Room room = roomRepository.save(Room.builder()
             .title(request.getTitle())
@@ -44,6 +46,7 @@ public class RoomService {
             .id(new RoomParticipantId(room.getId(), host.getId()))
             .room(room)
             .user(host)
+            .color(color)
             .build());
 
         return RoomResponse.from(room);
@@ -63,7 +66,9 @@ public class RoomService {
     }
 
     @Transactional
-    public void joinRoom(UUID roomId, User user) {
+    public void joinRoom(UUID roomId, JoinRoomRequest request, User user) {
+        String color = validateColor(request.getColor());
+
         Room room = roomRepository.findByIdWithLock(roomId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
@@ -76,15 +81,32 @@ public class RoomService {
             throw new BusinessException(ErrorCode.ROOM_ALREADY_JOINED);
         }
 
-        if (roomParticipantRepository.countByIdRoomId(roomId) >= room.getMaxParticipants()) {
+        List<RoomParticipant> existing = roomParticipantRepository.findByIdRoomId(roomId);
+        if (existing.size() >= room.getMaxParticipants()) {
             throw new BusinessException(ErrorCode.ROOM_FULL);
+        }
+        boolean colorTaken = existing.stream().anyMatch(p -> p.getColor().equals(color));
+        if (colorTaken) {
+            throw new BusinessException(ErrorCode.COLOR_ALREADY_TAKEN);
         }
 
         roomParticipantRepository.save(RoomParticipant.builder()
             .id(participantId)
             .room(room)
             .user(user)
+            .color(color)
             .build());
+
+        // 새 참여자 입장을 같은 방의 모든 클라이언트에게 실시간 반영
+        messagingTemplate.convertAndSend("/topic/room/" + roomId + "/info", RoomResponse.from(room));
+    }
+
+    private String validateColor(String color) {
+        try {
+            return ParticipantColor.valueOf(color).name();
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new BusinessException(ErrorCode.INVALID_COLOR);
+        }
     }
 
     // 이름 수정은 모든 참여자, maxParticipants 수정은 방장만 가능

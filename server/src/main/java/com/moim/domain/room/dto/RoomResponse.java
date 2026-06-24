@@ -40,13 +40,13 @@ public class RoomResponse {
             .participantCount(room.getParticipantCount())
             .maxParticipants(room.getMaxParticipants())
             .participants(room.getParticipants().stream()
-                .map(p -> new ParticipantInfo(p.getUser().getId(), p.getUser().getName()))
+                .map(p -> new ParticipantInfo(p.getUser().getId(), p.getUser().getName(), p.getColor()))
                 .toList())
             .createdAt(room.getCreatedAt())
             .build();
     }
 
-    public record ParticipantInfo(UUID id, String name) {}
+    public record ParticipantInfo(UUID id, String name, String color) {}
 
     public record ConfirmedPlaceInfo(UUID id, String name, String address, Double lat, Double lng) {
         static ConfirmedPlaceInfo from(Place place) {

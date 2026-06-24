@@ -27,7 +27,7 @@ function uid() {
   return `mk-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 }
 
-function pinContent(placeName, username, labelId, userLabelId) {
+function pinContent(placeName, color, labelId) {
   const gap = PIN_W / 2 + 5; // 핀 가장자리에서 라벨까지 여백(px)
   return `
     <div style="position:relative;width:0;height:0;pointer-events:none">
@@ -37,19 +37,13 @@ function pinContent(placeName, username, labelId, userLabelId) {
         xmlns="http://www.w3.org/2000/svg">
         <path
           d="M12 0C5.4 0 0 5.4 0 12C0 21 12 34 12 34C12 34 24 21 24 12C24 5.4 18.6 0 12 0Z"
-          fill="#0068C3" stroke="#fff" stroke-width="1.5"/>
+          fill="${color}" stroke="#fff" stroke-width="1.5"/>
         <circle cx="12" cy="12" r="4.5" fill="white"/>
       </svg>
       <!-- 장소명: 핀 오른쪽 -->
-      <span id="${labelId}" style="${LABEL_BASE};left:${gap}px;color:#0068C3;">
+      <span id="${labelId}" style="${LABEL_BASE};left:${gap}px;color:${color};">
         ${placeName}
       </span>
-      <!-- 등록자: 핀 왼쪽 (반대편) -->
-      ${username ? `
-        <span id="${userLabelId}" style="${LABEL_BASE};right:${gap}px;color:#555;text-align:right;">
-          ${username}
-        </span>
-      ` : ''}
     </div>
   `;
 }
@@ -57,7 +51,7 @@ function pinContent(placeName, username, labelId, userLabelId) {
 export default function useNaverMap() {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
-  // { marker, lat, lng, labelId, userLabelId }[]
+  // { marker, lat, lng, labelId }[]
   const metaRef = useRef([]);
   const [mapReady, setMapReady] = useState(false);
 
@@ -84,12 +78,10 @@ export default function useNaverMap() {
       }
     }
 
-    metas.forEach(({ labelId, userLabelId }) => {
+    metas.forEach(({ labelId }) => {
       const show = overlap ? 'none' : 'block';
       const lEl = document.getElementById(labelId);
-      const uEl = document.getElementById(userLabelId);
       if (lEl) lEl.style.display = show;
-      if (uEl) uEl.style.display = show;
     });
   };
 
@@ -124,24 +116,23 @@ export default function useNaverMap() {
    * @param {number} lat
    * @param {number} lng
    * @param {string} label - 장소명 (핀 오른쪽)
-   * @param {string} [username] - 등록자명 (핀 왼쪽)
+   * @param {string} [color] - 등록자의 고유 색상 (hex)
    */
-  const addMarker = (lat, lng, label, username = '') => {
+  const addMarker = (lat, lng, label, color = '#0068C3') => {
     if (!mapRef.current || !window.naver?.maps) return null;
     const labelId = uid();
-    const userLabelId = uid();
     // 순수 표시용 마커: 클릭 등 어떤 이벤트도 받지 않음 (clickable: false)
     const marker = new window.naver.maps.Marker({
       position: new window.naver.maps.LatLng(lat, lng),
       map: mapRef.current,
       clickable: false,
       icon: {
-        content: pinContent(label, username, labelId, userLabelId),
+        content: pinContent(label, color, labelId),
         // anchor = 핀 꼭짓점(tip): content div의 (0,0)이 좌표와 일치
         anchor: new window.naver.maps.Point(0, 0),
       },
     });
-    metaRef.current.push({ marker, lat, lng, labelId, userLabelId });
+    metaRef.current.push({ marker, lat, lng, labelId });
     setTimeout(syncLabels, 0);
     return marker;
   };

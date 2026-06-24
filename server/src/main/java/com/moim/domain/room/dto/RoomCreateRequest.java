@@ -16,4 +16,7 @@ public class RoomCreateRequest {
     @Min(value = 1, message = "최소 인원은 1명입니다.")
     @Max(value = 10, message = "최대 인원은 10명입니다.")
     private Integer maxParticipants;
+
+    @NotBlank(message = "색상은 필수입니다.")
+    private String color;
 }

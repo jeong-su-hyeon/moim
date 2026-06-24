@@ -28,6 +28,9 @@ public class RoomParticipant {
     @JoinColumn(name = "user_id")
     private User user;
 
+    @Column(name = "color", nullable = false)
+    private String color;
+
     @CreationTimestamp
     @Column(name = "joined_at", nullable = false, updatable = false)
     private LocalDateTime joinedAt;

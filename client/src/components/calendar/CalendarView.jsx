@@ -4,6 +4,7 @@ import useRoomStore from '../../stores/useRoomStore.js';
 import { saveMyDates } from '../../services/scheduleService.js';
 import Toast from '../common/Toast.jsx';
 import { toDateString, firstDayOf, lastDayOf, WEEKDAYS } from '../../utils/dateUtils.js';
+import { colorHex } from '../../constants/index.js';
 import styles from './CalendarView.module.css';
 
 export default function CalendarView({ roomId }) {
@@ -72,7 +73,7 @@ export default function CalendarView({ roomId }) {
         <div className={styles.legend}>
           {participants.map((p) => (
             <span key={p.id} className={styles.legendItem}>
-              <span className={styles.legendDot} style={{ background: participantColor(p.id) }} />
+              <span className={styles.legendDot} style={{ background: colorHex(p.color) }} />
               {p.name}
             </span>
           ))}
@@ -89,8 +90,8 @@ export default function CalendarView({ roomId }) {
           const dateStr = toDateString(new Date(year, month, day));
           const isPast = dateStr < todayStr; // 오늘 미포함, 어제까지 비활성화
           const isSelected = myDates.includes(dateStr);
-          const names = countMap[dateStr] ?? [];
-          const count = Array.isArray(names) ? names.length : Number(names);
+          const dayParticipants = countMap[dateStr] ?? [];
+          const count = Array.isArray(dayParticipants) ? dayParticipants.length : Number(dayParticipants);
           const total = participants.length || 1;
           const ratio = count / total;
 
@@ -111,8 +112,15 @@ export default function CalendarView({ roomId }) {
                   <span className={styles.countBadge} style={{ opacity: 0.4 + ratio * 0.6 }}>
                     {count}명
                   </span>
-                  <span className={styles.nameList}>
-                    {names.join(', ')}
+                  <span className={styles.dotRow}>
+                    {dayParticipants.map((p) => (
+                      <span
+                        key={p.id}
+                        className={styles.miniDot}
+                        style={{ background: colorHex(p.color) }}
+                        title={p.name}
+                      />
+                    ))}
                   </span>
                 </>
               )}
@@ -166,6 +174,3 @@ export default function CalendarView({ roomId }) {
     </div>
   );
 }
-
-const COLORS = ['#e53935', '#fb8c00', '#43a047', '#1e88e5', '#8e24aa', '#00acc1'];
-const participantColor = (id) => COLORS[parseInt(id, 36) % COLORS.length] ?? '#999';
