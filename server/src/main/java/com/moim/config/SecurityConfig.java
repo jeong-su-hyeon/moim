@@ -3,6 +3,7 @@ package com.moim.config;
 import com.moim.auth.jwt.JwtAuthenticationFilter;
 import com.moim.auth.oauth2.CookieOAuth2RequestRepository;
 import com.moim.auth.oauth2.CustomOAuth2UserService;
+import com.moim.auth.oauth2.OAuth2FailureHandler;
 import com.moim.auth.oauth2.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +30,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
+    private final OAuth2FailureHandler oAuth2FailureHandler;
     private final CookieOAuth2RequestRepository cookieOAuth2RequestRepository;
 
     @Value("${app.front-url}")
@@ -55,6 +57,7 @@ public class SecurityConfig {
                 .userInfoEndpoint(ui ->
                     ui.userService(customOAuth2UserService))
                 .successHandler(oAuth2SuccessHandler)
+                .failureHandler(oAuth2FailureHandler)
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

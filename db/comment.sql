@@ -15,7 +15,7 @@ COMMENT ON COLUMN users.email           IS '로그인 식별자. 소셜 로그�
 COMMENT ON COLUMN users.name            IS '표시 이름 (닉네임)';
 COMMENT ON COLUMN users.profile_url     IS '프로필 이미지 URL (소셜 제공 또는 null)';
 COMMENT ON COLUMN users.password_hash   IS '로컬 로그인 비밀번호 해시. 소셜 전용 계정은 null';
-COMMENT ON COLUMN users.provider        IS '가입 경로 — LOCAL / GOOGLE / KAKAO';
+COMMENT ON COLUMN users.provider        IS '가입 경로 — LOCAL / GOOGLE / KAKAO / NAVER';
 COMMENT ON COLUMN users.provider_id     IS '소셜 로그인 제공자 측 사용자 식별자. 로컬 계정은 null';
 COMMENT ON COLUMN users.created_at      IS '계정 생성 일시';
 

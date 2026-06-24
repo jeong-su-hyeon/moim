@@ -29,19 +29,26 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         OAuth2UserInfo userInfo = switch (registrationId) {
             case "google" -> new GoogleOAuth2UserInfo(oAuth2User.getAttributes());
             case "kakao"  -> new KakaoOAuth2UserInfo(oAuth2User.getAttributes());
+            case "naver"  -> new NaverOAuth2UserInfo(oAuth2User.getAttributes());
             default       -> throw new OAuth2AuthenticationException("Unsupported provider: " + registrationId);
         };
 
         User user = userRepository.findByProviderAndProviderId(userInfo.getProvider(), userInfo.getProviderId())
-            .orElseGet(() -> userRepository.save(
-                User.builder()
-                    .email(userInfo.getEmail())
-                    .name(userInfo.getName())
-                    .profileUrl(userInfo.getProfileUrl())
-                    .provider(userInfo.getProvider())
-                    .providerId(userInfo.getProviderId())
-                    .build()
-            ));
+            .orElseGet(() -> {
+                if (userRepository.findByEmail(userInfo.getEmail()).isPresent()) {
+                    throw new OAuth2AuthenticationException(
+                        "이미 다른 방식으로 가입된 이메일입니다: " + userInfo.getEmail());
+                }
+                return userRepository.save(
+                    User.builder()
+                        .email(userInfo.getEmail())
+                        .name(userInfo.getName())
+                        .profileUrl(userInfo.getProfileUrl())
+                        .provider(userInfo.getProvider())
+                        .providerId(userInfo.getProviderId())
+                        .build()
+                );
+            });
 
         return new DefaultOAuth2User(List.of(),
             Map.of("id", user.getId().toString(),

@@ -30,7 +30,7 @@ const router = createBrowserRouter([
   { path: "/login",                element: wrap(<Login />),         errorElement: <RouteError /> },
   { path: "/signup",               element: wrap(<Signup />),        errorElement: <RouteError /> },
   { path: "/auth/callback/google", element: wrap(<OAuthCallback />), errorElement: <RouteError /> },
-  { path: "/auth/callback/kakao",  element: wrap(<OAuthCallback />), errorElement: <RouteError /> },
+  { path: "/auth/callback/naver",  element: wrap(<OAuthCallback />), errorElement: <RouteError /> },
   { path: "/room/new",             element: wrap(<RoomNew />),       errorElement: <RouteError /> },
   { path: "/room/:roomId",         element: wrap(<Room />),          errorElement: <RouteError /> },
   { path: "/room/:roomId/result",  element: wrap(<Result />),        errorElement: <RouteError /> },
