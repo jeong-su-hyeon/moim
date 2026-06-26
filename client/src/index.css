@@ -4,19 +4,53 @@
   padding: 0;
 }
 
+html {
+  height: 100%;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 14px;
   color: #1a1a1a;
   background: #fff;
-  height: 100vh;
+  height: 100%;
+  min-height: 100dvh;
   overflow: hidden;
 }
 
 #root {
-  height: 100vh;
+  height: 100%;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
+}
+
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+@media (max-width: 768px) {
+  body {
+    font-size: 13px;
+  }
+
+  /* 모바일 자동 확대 방지: 텍스트 입력 계열만 적용 (select는 컴포넌트 크기 유지) */
+  input,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* 셀렉트 박스 폰트 크기 통일 */
+select {
+  font-size: 13px;
+}
+
+:root {
+  --bp-mobile: 480px;
+  --bp-tablet: 768px;
 }
 
 a {

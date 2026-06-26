@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useAuthStore from '../../stores/useAuthStore.js';
 import { getMyRooms } from '../../services/roomService.js';
+import Spinner from '../../components/common/Spinner.jsx';
 import styles from './Home.module.css';
 
 const STATUS_LABEL = {
@@ -140,7 +141,7 @@ export default function Home() {
             </div>
 
             {loading ? (
-              <p className={styles.empty}>불러오는 중...</p>
+              <Spinner label="약속방을 불러오는 중..." />
             ) : rooms.length === 0 ? (
               <p className={styles.empty}>아직 참여한 약속방이 없습니다.</p>
             ) : visibleRooms.length === 0 ? (

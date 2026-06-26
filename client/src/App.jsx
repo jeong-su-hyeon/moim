@@ -1,6 +1,7 @@
 ﻿import { Component } from "react";
 import { RouterProvider } from "react-router-dom";
 import router from "./router.jsx";
+import ErrorState from "./components/common/ErrorState.jsx";
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null }; }
@@ -8,12 +9,11 @@ class ErrorBoundary extends Component {
   render() {
     if (this.state.error) {
       return (
-        <div style={{ padding: "40px", fontFamily: "monospace" }}>
-          <h2 style={{ color: "red" }}>렌더링 오류</h2>
-          <pre style={{ marginTop: "12px", whiteSpace: "pre-wrap", color: "#333" }}>
-            {this.state.error.toString()}
-          </pre>
-        </div>
+        <ErrorState
+          type="generic"
+          title="렌더링 오류"
+          message={this.state.error.toString()}
+        />
       );
     }
     return this.props.children;

@@ -338,9 +338,7 @@ export default function MapView({ roomId }) {
                     onDragLeave={() => setDragOverCategory((c) => (c === value ? null : c))}
                     onDrop={(e) => handleCategoryDrop(e, value)}
                   >
-                  {list.length === 0 ? (
-                    <p className={styles.emptyMsg}>우리 {label}도 하나 골라야해!</p>
-                  ) : (
+                  {list.length === 0 ? null : (
                     list.map((place) => (
                       <div
                         key={place.id}

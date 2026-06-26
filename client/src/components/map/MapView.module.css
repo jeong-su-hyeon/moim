@@ -200,12 +200,15 @@
 
 .categoryFilterRow {
   display: flex;
+  flex-wrap: nowrap;
   gap: 6px;
-  padding: 8px 8px 0;
+  padding: 8px;
   flex-shrink: 0;
+  overflow-x: auto;
 }
 
 .categoryFilterChip {
+  flex-shrink: 0;
   padding: 4px 10px;
   border: 1px solid #ddd;
   border-radius: 16px;
@@ -253,13 +256,13 @@
 }
 
 .sortSelect {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: #666;
   background: #fff;
   border: 1px solid #ddd;
   border-radius: 4px;
-  padding: 2px 4px;
+  padding: 2px 6px;
   cursor: pointer;
 }
 
@@ -461,4 +464,32 @@
 .duration {
   font-weight: 600;
   color: #333;
+}
+
+@media (max-width: 768px) {
+  .mapArea {
+    flex-direction: column;
+  }
+
+  .mapWrapper {
+    flex: 1 1 50%;
+    min-height: 220px;
+  }
+
+  .candidateList {
+    width: 100%;
+    min-width: 0;
+    border-left: none;
+    border-top: 1px solid #e0e0e0;
+    flex: 1 1 50%;
+  }
+
+  .searchBar {
+    flex-wrap: nowrap;
+  }
+
+  .searchBtn {
+    flex-shrink: 0;
+    padding: 6px 12px;
+  }
 }

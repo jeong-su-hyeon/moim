@@ -24,16 +24,7 @@ function formatDateLabel(dateStr) {
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
 }
 
-function useNow() {
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return now;
-}
-
-export default function ChatPanel({ roomId, sendMessage, loadMore }) {
+export default function ChatPanel({ roomId, roomTitle, sendMessage, loadMore, onClose }) {
   const [input, setInput] = useState('');
   const [loadingMore, setLoadingMore] = useState(false);
   const [noMore, setNoMore] = useState(false);
@@ -48,11 +39,6 @@ export default function ChatPanel({ roomId, sendMessage, loadMore }) {
 
   const { messages, isConnected } = useChatStore();
   const user = useAuthStore((s) => s.user);
-  const now = useNow();
-
-  const days = ['일', '월', '화', '수', '목', '금', '토'];
-  const todayLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 (${days[now.getDay()]})`;
-  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
 
   // 새 메시지 → 하단 스크롤 / prepend → 위치 유지 / 스크롤 위쪽일 땐 안읽음 배지 증가
   useEffect(() => {
@@ -152,12 +138,10 @@ export default function ChatPanel({ roomId, sendMessage, loadMore }) {
   return (
     <aside className={styles.panel}>
       <div className={styles.header}>
-        <div className={styles.headerTitle}>채팅</div>
-        <div className={styles.headerRight}>
-          <span className={styles.headerDate}>{todayLabel}</span>
-          <span className={styles.headerTime}>{currentTime}</span>
-          <span className={`${styles.dot} ${isConnected ? styles.dotOn : styles.dotOff}`} />
-        </div>
+        <div className={styles.headerTitle}>💬 {roomTitle ?? '모임'} 톡방</div>
+        {onClose && (
+          <button className={styles.closeBtn} onClick={onClose} aria-label="채팅 닫기">✕</button>
+        )}
       </div>
 
       <div className={styles.messagesWrap}>

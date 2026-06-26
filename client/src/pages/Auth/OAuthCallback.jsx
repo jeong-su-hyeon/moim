@@ -2,6 +2,7 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useAuthStore from "../../stores/useAuthStore.js";
 import api from "../../services/api.js";
+import Spinner from "../../components/common/Spinner.jsx";
 
 export default function OAuthCallback() {
   const navigate = useNavigate();
@@ -20,5 +21,5 @@ export default function OAuthCallback() {
       .catch(() => navigate("/login"));
   }, []);
 
-  return <p style={{ padding: "40px", textAlign: "center" }}>로그인 처리 중...</p>;
+  return <Spinner fullPage label="로그인 처리 중..." />;
 }

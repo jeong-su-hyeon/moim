@@ -14,3 +14,13 @@
 
 .show { opacity: 1; }
 .hide { opacity: 0; }
+
+@media (max-width: 480px) {
+  .toast {
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    left: 16px;
+    right: 16px;
+    transform: none;
+    text-align: center;
+  }
+}
