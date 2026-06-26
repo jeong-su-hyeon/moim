@@ -16,6 +16,8 @@ const CATEGORIES = [
 
 const CATEGORY_FILTERS = [{ value: 'ALL', label: '전체', emoji: '🗂️' }, ...CATEGORIES];
 
+const CATEGORY_MAP = CATEGORIES.reduce((acc, c) => ({ ...acc, [c.value]: c }), {});
+
 export default function MapView({ roomId }) {
   const { candidates, setCandidates, addCandidate, removeCandidate, updatePlaceLike, updatePlace, travelTimes, setTravelTimes } = useLocationStore();
   const currentUserId = useAuthStore((s) => s.user?.id);
@@ -250,7 +252,7 @@ export default function MapView({ roomId }) {
         <div className={styles.searchBar}>
           <input
             className={styles.searchInput}
-            placeholder="장소명 검색 (예: 강남역, 스타벅스 강남점)"
+            placeholder="장소 검색"
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setSearchResults([]); }}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -294,31 +296,29 @@ export default function MapView({ roomId }) {
 
           {/* 후보지 목록 (카테고리별 세로 구분) */}
           <div className={styles.candidateList}>
-            <div className={styles.candidateTitleRow}>
-              <h3 className={styles.candidateTitle}>
-                후보 장소
-                {saving && <span className={styles.savingDot}> 저장 중...</span>}
-              </h3>
-              <select
-                className={styles.sortSelect}
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-              >
-                <option value="created">등록순</option>
-                <option value="like">좋아요순</option>
-              </select>
-            </div>
-
-            <div className={styles.categoryFilterRow}>
-              {CATEGORY_FILTERS.map(({ value, label, emoji }) => (
-                <button
-                  key={value}
-                  className={`${styles.categoryFilterChip} ${categoryFilter === value ? styles.categoryFilterChipActive : ''}`}
-                  onClick={() => setCategoryFilter(value)}
+            <div className={styles.filterRow}>
+              <span className={styles.pillSelectWrap}>
+                <select
+                  className={styles.pillSelect}
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
                 >
-                  {emoji} {label}
-                </button>
-              ))}
+                  <option value="created">등록순</option>
+                  <option value="like">좋아요순</option>
+                </select>
+              </span>
+              <span className={styles.pillSelectWrap}>
+                <select
+                  className={styles.pillSelect}
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                >
+                  {CATEGORY_FILTERS.map(({ value, label }) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </span>
+              {saving && <span className={styles.savingDot}>저장 중...</span>}
             </div>
 
             {CATEGORIES.filter(({ value }) => categoryFilter === 'ALL' || categoryFilter === value).map(({ value, label, emoji }) => {
@@ -357,7 +357,12 @@ export default function MapView({ roomId }) {
                           className={styles.candidateBtn}
                           onClick={() => { setActivePlace(place); panTo(place.lat, place.lng); }}
                         >
-                          <span className={styles.placeName}>{place.name}</span>
+                          <span className={styles.placeNameRow}>
+                            <span className={styles.placeName}>{place.name}</span>
+                            <span className={styles.categoryBadge}>
+                              {CATEGORY_MAP[place.category]?.emoji} {CATEGORY_MAP[place.category]?.label}
+                            </span>
+                          </span>
                           <span className={styles.placeAddr}>{place.address}</span>
                           <span className={styles.registeredBy}>{place.registeredByName}</span>
                         </button>

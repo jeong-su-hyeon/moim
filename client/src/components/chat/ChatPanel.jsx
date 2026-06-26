@@ -138,10 +138,12 @@ export default function ChatPanel({ roomId, roomTitle, sendMessage, loadMore, on
   return (
     <aside className={styles.panel}>
       <div className={styles.header}>
-        <div className={styles.headerTitle}>💬 {roomTitle ?? '모임'} 톡방</div>
         {onClose && (
-          <button className={styles.closeBtn} onClick={onClose} aria-label="채팅 닫기">✕</button>
+          <button className={styles.backBtn} onClick={onClose} aria-label="채팅 닫기">
+            <span className={styles.backChevron} />
+          </button>
         )}
+        <div className={styles.headerTitle}>{roomTitle ?? '모임'}</div>
       </div>
 
       <div className={styles.messagesWrap}>
