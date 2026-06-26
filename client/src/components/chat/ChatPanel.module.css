@@ -11,12 +11,12 @@
 
 /* ── 헤더 ── */
 .header {
+  position: relative;
   padding: 10px 14px;
   border-bottom: 1px solid #e0e0e0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: center;
 }
 
 .headerTitle {
@@ -25,20 +25,32 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: center;
 }
 
-.closeBtn {
+.backBtn {
   display: none;
-  font-size: 16px;
-  color: #888;
-  width: 26px;
-  height: 26px;
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: 50%;
 }
 
-.closeBtn:hover {
+.backChevron {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-left: 1.5px solid #555;
+  border-bottom: 1.5px solid #555;
+  transform: rotate(45deg);
+}
+
+.backBtn:hover {
   background: #f0f0f0;
 }
 
@@ -264,7 +276,7 @@
     border-left: none;
   }
 
-  .closeBtn {
+  .backBtn {
     display: flex;
   }
 
