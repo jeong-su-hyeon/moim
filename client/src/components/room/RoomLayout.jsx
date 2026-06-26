@@ -26,6 +26,7 @@ export default function RoomLayout({ room }) {
   const [copyToast, setCopyToast] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const { setAggregated, aggregated } = useScheduleStore();
   const { updatePlaceLike, addCandidate, removeCandidate, updatePlace } = useLocationStore();
   const { setRoom, setParticipants } = useRoomStore();
@@ -93,7 +94,18 @@ export default function RoomLayout({ room }) {
 
   return (
     <div className={styles.layout}>
-      {/* 왼쪽 세로 네비게이션 */}
+      {/* 모바일 상단 헤더 */}
+      <header className={styles.mobileHeader}>
+        <span className={styles.mobileTitle}>{room?.title ?? '모임'}</span>
+        <div className={styles.mobileHeaderActions}>
+          <button className={styles.mobileIconBtn} onClick={handleCopyLink} title="초대 링크 복사">🔗</button>
+          <button className={styles.mobileIconBtn} onClick={() => setShowParticipants(true)} title="참여자 목록">👥</button>
+          <button className={styles.mobileIconBtn} onClick={() => setShowSettings(true)} title="설정">⚙️</button>
+          <Link to="/" className={styles.mobileIconBtn} title="홈으로">🏠</Link>
+        </div>
+      </header>
+
+      {/* 왼쪽 세로 네비게이션 (데스크톱) */}
       <nav className={styles.nav}>
         <div className={styles.navTitle}>
           <span className={styles.navTitleText}>{room?.title ?? '모임'}</span>
@@ -142,8 +154,38 @@ export default function RoomLayout({ room }) {
         {activeTab === TABS.RESULT && <ResultView room={room} aggregated={aggregated} />}
       </main>
 
-      {/* 오른쪽 채팅 패널 */}
-      <ChatPanel roomId={room?.id} sendMessage={sendMessage} loadMore={loadMore} />
+      {/* 채팅 패널: 데스크톱은 고정 패널, 모바일은 토글 드로어 */}
+      <div className={`${styles.chatWrap} ${showChat ? styles.chatWrapOpen : ''}`}>
+        <ChatPanel
+          roomId={room?.id}
+          roomTitle={room?.title}
+          sendMessage={sendMessage}
+          loadMore={loadMore}
+          onClose={() => setShowChat(false)}
+        />
+      </div>
+      {showChat && <div className={styles.chatBackdrop} onClick={() => setShowChat(false)} />}
+
+      {/* 모바일 하단 탭바 */}
+      <nav className={styles.bottomBar}>
+        {NAV_ITEMS.map(({ tab, label, icon }) => (
+          <button
+            key={tab}
+            className={`${styles.bottomBarBtn} ${activeTab === tab && !showChat ? styles.bottomBarBtnActive : ''}`}
+            onClick={() => { setShowChat(false); handleTabChange(tab); }}
+          >
+            <span className={styles.bottomBarIcon}>{icon}</span>
+            <span className={styles.bottomBarLabel}>{label.replace('\n', ' ')}</span>
+          </button>
+        ))}
+        <button
+          className={`${styles.bottomBarBtn} ${showChat ? styles.bottomBarBtnActive : ''}`}
+          onClick={() => setShowChat(true)}
+        >
+          <span className={styles.bottomBarIcon}>💬</span>
+          <span className={styles.bottomBarLabel}>채팅</span>
+        </button>
+      </nav>
 
       {copyToast && <Toast message={copyToast} onClose={() => setCopyToast(null)} />}
 

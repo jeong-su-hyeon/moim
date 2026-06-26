@@ -116,3 +116,19 @@
 .cancelBtn:hover {
   background: #f5f5f5;
 }
+
+@media (max-width: 480px) {
+  .joinPage {
+    height: 100dvh;
+    padding: 16px;
+  }
+
+  .joinCard {
+    padding: 28px 24px;
+    min-width: 0;
+  }
+
+  .joinTitle {
+    font-size: 19px;
+  }
+}

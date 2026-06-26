@@ -1,7 +1,14 @@
 .layout {
   display: flex;
-  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
+  position: relative;
+}
+
+/* ── 모바일 상단 헤더 / 하단 탭바 (데스크톱에서는 숨김) ── */
+.mobileHeader,
+.bottomBar {
+  display: none;
 }
 
 /* ── 왼쪽 네비게이션 ── */
@@ -526,6 +533,14 @@
   overflow: auto;
 }
 
+.chatWrap {
+  flex-shrink: 0;
+}
+
+.chatBackdrop {
+  display: none;
+}
+
 /* ── 최종 약속 탭 ── */
 .resultWrap {
   padding: 32px 28px;
@@ -734,4 +749,136 @@
 .unconfirmBtn:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* ══════════ 모바일 레이아웃 (≤768px) ══════════ */
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+  }
+
+  /* 데스크톱 좌측 네비게이션 숨김 */
+  .nav {
+    display: none;
+  }
+
+  /* 모바일 상단 헤더 */
+  .mobileHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 48px;
+    flex-shrink: 0;
+    padding: 0 12px;
+    border-bottom: 1px solid #e0e0e0;
+    background: #fff;
+  }
+
+  .mobileTitle {
+    font-size: 15px;
+    font-weight: 700;
+    color: #222;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobileHeaderActions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  .mobileIconBtn {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    border-radius: 6px;
+    color: #555;
+  }
+
+  .mobileIconBtn:hover {
+    background: #f0f0f0;
+  }
+
+  /* 메인 영역: 상단 헤더 + 하단 탭바 공간 확보 */
+  .main {
+    padding-bottom: 8px;
+  }
+
+  /* 채팅: 전체화면 드로어 */
+  .chatWrap {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    background: #fff;
+  }
+
+  .chatWrapOpen {
+    transform: translateX(0);
+  }
+
+  .chatWrap > * {
+    height: 100%;
+  }
+
+  /* 하단 탭바 */
+  .bottomBar {
+    display: flex;
+    flex-shrink: 0;
+    border-top: 1px solid #e0e0e0;
+    background: #fff;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .bottomBarBtn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 0;
+    color: #888;
+  }
+
+  .bottomBarBtnActive {
+    color: #1a73e8;
+    font-weight: 600;
+  }
+
+  .bottomBarIcon {
+    font-size: 18px;
+  }
+
+  .bottomBarLabel {
+    font-size: 10px;
+  }
+
+  /* 모달 폭 보정 */
+  .modal {
+    width: calc(100vw - 24px);
+  }
+
+  .resultWrap {
+    padding: 20px 16px;
+  }
+
+  .resultAllItem {
+    flex-wrap: wrap;
+  }
+
+  .resultAllRight {
+    flex-wrap: wrap;
+  }
+
+  .resultBest {
+    padding: 16px 18px;
+  }
 }

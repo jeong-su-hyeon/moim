@@ -6,12 +6,19 @@ import useAuthStore from '../../stores/useAuthStore.js';
 import { joinRoom, getRoom } from '../../services/roomService.js';
 import RoomLayout from '../../components/room/RoomLayout.jsx';
 import ColorPicker from '../../components/common/ColorPicker.jsx';
+import Spinner from '../../components/common/Spinner.jsx';
+import ErrorState from '../../components/common/ErrorState.jsx';
 import styles from './Room.module.css';
+
+const ROOM_ERROR_TYPE = {
+  ROOM_EXPIRED: 'roomExpired',
+  ROOM_NOT_FOUND: 'roomNotFound',
+};
 
 export default function Room() {
   const { roomId } = useParams();
   const navigate = useNavigate();
-  useRoom(roomId);
+  const { error: roomError } = useRoom(roomId);
 
   const room = useRoomStore((s) => s.room);
   const { user, isAuthenticated } = useAuthStore();
@@ -19,8 +26,12 @@ export default function Room() {
   const [error, setError] = useState(null);
   const [color, setColor] = useState(null);
 
+  if (roomError) {
+    return <ErrorState type={ROOM_ERROR_TYPE[roomError] ?? 'roomNotFound'} />;
+  }
+
   if (!room || room.id !== roomId) {
-    return <div className={styles.loading}>방 정보를 불러오는 중...</div>;
+    return <Spinner fullPage label="방 정보를 불러오는 중..." />;
   }
 
   // 현재 유저가 참여자인지 확인

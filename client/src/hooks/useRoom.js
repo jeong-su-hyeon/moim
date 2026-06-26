@@ -1,17 +1,17 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { getRoom } from "../services/roomService.js";
 import { getAggregatedSchedules, getMySchedules } from "../services/scheduleService.js";
 import useRoomStore from "../stores/useRoomStore.js";
 import useScheduleStore from "../stores/useScheduleStore.js";
 
 export default function useRoom(roomId) {
-  const navigate = useNavigate();
   const { setRoom, setParticipants } = useRoomStore();
   const { setAggregated, setMyDates } = useScheduleStore();
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!roomId) return;
+    setError(null);
 
     (async () => {
       // 방 정보·집계일정·내 일정을 병렬로 요청
@@ -21,9 +21,10 @@ export default function useRoom(roomId) {
         getMySchedules(roomId),
       ]);
 
-      // 방 정보 실패 → 홈으로
+      // 방 정보 실패 → 에러 상태로 전환 (호출부에서 404/만료 화면 표시)
       if (roomRes.status === 'rejected') {
-        navigate('/');
+        const code = roomRes.reason?.response?.data?.error?.code;
+        setError(code ?? 'ROOM_NOT_FOUND');
         return;
       }
 
@@ -42,4 +43,6 @@ export default function useRoom(roomId) {
       setParticipants(roomData.participants ?? []);
     })();
   }, [roomId]);
+
+  return { error };
 }
