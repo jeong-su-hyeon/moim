@@ -18,7 +18,6 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -66,12 +65,13 @@ public class LocationService {
         }
     }
 
+    // 본인 출발지만 조회 — 다른 참여자의 출발지는 노출하지 않는다.
     @Transactional(readOnly = true)
-    public List<OriginResponse> getOrigins(UUID roomId, User user) {
+    public OriginResponse getMyOrigin(UUID roomId, User user) {
         roomService.validateParticipant(roomId, user.getId());
-        return userOriginRepository.findByRoomId(roomId).stream()
+        return userOriginRepository.findByRoomIdAndUserId(roomId, user.getId())
             .map(OriginResponse::from)
-            .toList();
+            .orElse(null);
     }
 
     @Transactional
@@ -178,52 +178,51 @@ public class LocationService {
     }
 
     /**
-     * 후보지에 대한 참여자별 이동시간 조회.
+     * 후보지에 대한 본인 이동시간만 조회 — 다른 참여자의 이동시간은 노출하지 않는다.
+     * (시간 여유가 있는 사람이 더 멀리 움직여줄 수 있어 굳이 비교를 노출할 필요가 없다는 정책)
+     * 출발지를 입력하지 않은 경우 null 반환 (프론트에서 "출발지 미입력"으로 처리).
      * 캐시 우선 — CAR 모드 캐시 미스 시 Naver Directions API 호출 후 저장.
-     * 개별 API 실패는 건너뛰어 나머지 결과를 그대로 반환한다.
      */
     @Transactional
-    public List<TravelTimeResponse> getTravelTimes(UUID roomId, UUID placeId, TransportMode transport, User user) {
+    public TravelTimeResponse getMyTravelTime(UUID roomId, UUID placeId, TransportMode transport, User user) {
         roomService.validateParticipant(roomId, user.getId());
 
         Place place = placeRepository.findByIdAndRoomId(placeId, roomId)
             .orElseThrow(() -> new BusinessException(ErrorCode.PLACE_NOT_FOUND));
 
-        List<UserOrigin> origins = userOriginRepository.findByRoomId(roomId);
-        List<TravelTimeResponse> results = new ArrayList<>();
-
-        for (UserOrigin origin : origins) {
-            Optional<TravelTime> cached = travelTimeRepository
-                .findByPlaceIdAndUserIdAndTransport(placeId, origin.getUser().getId(), transport);
-
-            if (cached.isPresent()) {
-                results.add(TravelTimeResponse.from(cached.get()));
-                continue;
-            }
-
-            // CAR 모드만 Naver Directions API 지원 (TRANSIT/WALK는 캐시 데이터만 반환)
-            if (transport != TransportMode.CAR) {
-                continue;
-            }
-
-            try {
-                int durationMin = naverDirectionsClient.getDrivingDurationMinutes(
-                    origin.getLng(), origin.getLat(),
-                    place.getLng(), place.getLat()
-                );
-                TravelTime saved = travelTimeRepository.save(TravelTime.builder()
-                    .place(place)
-                    .user(origin.getUser())
-                    .transport(transport)
-                    .durationMin(durationMin)
-                    .build());
-                results.add(TravelTimeResponse.from(saved));
-            } catch (BusinessException e) {
-                log.warn("Naver API 호출 실패 (userId={}, placeId={}): {}", origin.getUser().getId(), placeId, e.getMessage());
-            }
+        UserOrigin origin = userOriginRepository.findByRoomIdAndUserId(roomId, user.getId())
+            .orElse(null);
+        if (origin == null) {
+            return null;
         }
 
-        return results;
+        Optional<TravelTime> cached = travelTimeRepository
+            .findByPlaceIdAndUserIdAndTransport(placeId, user.getId(), transport);
+        if (cached.isPresent()) {
+            return TravelTimeResponse.from(cached.get());
+        }
+
+        // CAR 모드만 Naver Directions API 지원 (TRANSIT/WALK는 캐시 데이터만 반환)
+        if (transport != TransportMode.CAR) {
+            return null;
+        }
+
+        try {
+            int durationMin = naverDirectionsClient.getDrivingDurationMinutes(
+                origin.getLng(), origin.getLat(),
+                place.getLng(), place.getLat()
+            );
+            TravelTime saved = travelTimeRepository.save(TravelTime.builder()
+                .place(place)
+                .user(user)
+                .transport(transport)
+                .durationMin(durationMin)
+                .build());
+            return TravelTimeResponse.from(saved);
+        } catch (BusinessException e) {
+            log.warn("Naver API 호출 실패 (userId={}, placeId={}): {}", user.getId(), placeId, e.getMessage());
+            return null;
+        }
     }
 
     private Room findRoom(UUID roomId) {

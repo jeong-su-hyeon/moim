@@ -42,11 +42,12 @@ public class LocationController {
         return ResponseEntity.ok(ApiResponse.ok());
     }
 
+    // 본인 출발지만 반환 (다른 참여자 출발지는 비공개)
     @GetMapping("/origins")
-    public ResponseEntity<ApiResponse<List<OriginResponse>>> getOrigins(
+    public ResponseEntity<ApiResponse<OriginResponse>> getMyOrigin(
             @PathVariable UUID roomId,
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(ApiResponse.ok(locationService.getOrigins(roomId, user)));
+        return ResponseEntity.ok(ApiResponse.ok(locationService.getMyOrigin(roomId, user)));
     }
 
     @PostMapping("/places")
@@ -91,12 +92,13 @@ public class LocationController {
         return ResponseEntity.ok(ApiResponse.ok(locationService.toggleLike(roomId, placeId, user)));
     }
 
+    // 본인 이동시간만 반환 (다른 참여자 이동시간은 비공개)
     @GetMapping("/places/{placeId}/travel-times")
-    public ResponseEntity<ApiResponse<List<TravelTimeResponse>>> getTravelTimes(
+    public ResponseEntity<ApiResponse<TravelTimeResponse>> getMyTravelTime(
             @PathVariable UUID roomId,
             @PathVariable UUID placeId,
             @RequestParam(defaultValue = "CAR") TransportMode transport,
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(ApiResponse.ok(locationService.getTravelTimes(roomId, placeId, transport, user)));
+        return ResponseEntity.ok(ApiResponse.ok(locationService.getMyTravelTime(roomId, placeId, transport, user)));
     }
 }
