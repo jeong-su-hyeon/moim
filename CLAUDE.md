@@ -545,8 +545,9 @@ naver:
   directions:
     client-id: ${NAVER_CLIENT_ID}        # NCP Access Key ID (Directions + Geocoding 공용)
     client-secret: ${NAVER_CLIENT_SECRET} # NCP Secret Key
-    base-url: https://naveropenapi.apigw.ntruss.com
-                                         # Geocoding은 maps.apigw.ntruss.com 사용 (NaverPlacesClient)
+    base-url: https://maps.apigw.ntruss.com
+                                         # 신버전 NCP Maps API 도메인. naveropenapi.apigw.ntruss.com(구버전)으로
+                                         # 호출하면 콘솔에 Directions 5가 등록돼 있어도 401 Permission Denied 발생
 
 app:
   front-url: ${FRONT_URL:http://localhost:3000}  # 프론트 Origin (CORS + OAuth 리다이렉트)

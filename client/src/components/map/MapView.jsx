@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import useNaverMap from '../../hooks/useNaverMap.js';
 import useLocationStore from '../../stores/useLocationStore.js';
-import useRoomStore from '../../stores/useRoomStore.js';
-import { registerPlace, deletePlace, getPlaces, searchPlaces, togglePlaceLike, updatePlaceCategory, getTravelTimes } from '../../services/locationService.js';
+import {
+  registerPlace, deletePlace, getPlaces, searchPlaces, togglePlaceLike, updatePlaceCategory,
+  getMyOrigin, getMyTravelTime, saveMyOrigin,
+} from '../../services/locationService.js';
 import useAuthStore from '../../stores/useAuthStore.js';
 import CategoryModal from './CategoryModal.jsx';
+import OriginModal from './OriginModal.jsx';
 import { colorHex } from '../../constants/index.js';
 import styles from './MapView.module.css';
 
@@ -18,12 +21,16 @@ const CATEGORY_FILTERS = [{ value: 'ALL', label: '전체', emoji: '🗂️' }, .
 
 const CATEGORY_MAP = CATEGORIES.reduce((acc, c) => ({ ...acc, [c.value]: c }), {});
 
+// 백엔드가 현재 자동차(CAR) 이동시간만 계산 지원 — 대중교통/도보는 노출하지 않는다.
+const TRANSPORT = 'CAR';
+
 export default function MapView({ roomId }) {
-  const { candidates, setCandidates, addCandidate, removeCandidate, updatePlaceLike, updatePlace, travelTimes, setTravelTimes } = useLocationStore();
+  const {
+    candidates, setCandidates, addCandidate, removeCandidate, updatePlaceLike, updatePlace,
+    travelTimes, setTravelTime, myOrigin, setMyOrigin,
+  } = useLocationStore();
   const currentUserId = useAuthStore((s) => s.user?.id);
-  const { participants } = useRoomStore();
   const [activePlace, setActivePlace] = useState(null);
-  const [transport, setTransport] = useState('CAR'); // 백엔드가 현재 CAR(자동차)만 실제 계산 지원
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -40,6 +47,11 @@ export default function MapView({ roomId }) {
   const [loadingTravel, setLoadingTravel] = useState(false);
   const markerMapRef = useRef({});
   const searchContainerRef = useRef(null);
+
+  // 출발지 입력 모달 + "나중에" 선택 시 현재 위치로 폴백할지 여부
+  const [showOriginModal, setShowOriginModal] = useState(false);
+  const [originLoaded, setOriginLoaded] = useState(false);
+  const originFallbackPendingRef = useRef(false);
 
   // 장소 등록은 검색 결과 목록을 선택했을 때만 이루어진다.
   // 지도 클릭이나 후보 마커 클릭으로는 어떤 등록/이벤트도 발생하지 않는다.
@@ -89,6 +101,71 @@ export default function MapView({ roomId }) {
       .finally(() => setPlacesLoaded(true));
   }, [roomId]);
 
+  // 장소 탭 진입 시 내 출발지 조회. 없으면 직접 입력을 유도하는 모달을 띄운다.
+  useEffect(() => {
+    if (!roomId) return;
+    setOriginLoaded(false);
+    originFallbackPendingRef.current = false;
+    getMyOrigin(roomId)
+      .then((res) => {
+        const origin = res.data.data ?? null;
+        setMyOrigin(origin);
+        setShowOriginModal(!origin);
+      })
+      .catch(() => {
+        setMyOrigin(null);
+        setShowOriginModal(true);
+      })
+      .finally(() => setOriginLoaded(true));
+  }, [roomId]);
+
+  // "나중에"로 모달을 건너뛴 경우: 현재 위치 권한 확인이 끝나는 시점에 한 번만 폴백 적용.
+  // 권한 확인이 모달을 닫은 시점에 아직 진행 중일 수 있어 geoStatus 변화를 별도로 감시한다.
+  useEffect(() => {
+    if (!originFallbackPendingRef.current || geoStatus === 'pending') return;
+    originFallbackPendingRef.current = false;
+    if (geoStatus === 'granted' && geoRef.current) {
+      const { lat, lng } = geoRef.current;
+      saveMyOrigin(roomId, lat, lng, '현재 위치')
+        .then(() => setMyOrigin({ userId: currentUserId, lat, lng, label: '현재 위치' }))
+        .catch(() => {});
+    }
+    // geoStatus === 'denied'면 출발지는 계속 null → "출발지 미입력" 상태로 노출
+  }, [geoStatus, roomId, currentUserId]);
+
+  const handleOriginConfirm = async (lat, lng, label) => {
+    try {
+      await saveMyOrigin(roomId, lat, lng, label);
+      setMyOrigin({ userId: currentUserId, lat, lng, label });
+      setShowOriginModal(false);
+    } catch {
+    }
+  };
+
+  const handleUseCurrentLocationForOrigin = async () => {
+    if (geoStatus !== 'granted' || !geoRef.current) return;
+    const { lat, lng } = geoRef.current;
+    try {
+      await saveMyOrigin(roomId, lat, lng, '현재 위치');
+      setMyOrigin({ userId: currentUserId, lat, lng, label: '현재 위치' });
+      setShowOriginModal(false);
+    } catch {
+    }
+  };
+
+  const handleSkipOrigin = () => {
+    setShowOriginModal(false);
+    if (geoStatus === 'pending') {
+      originFallbackPendingRef.current = true; // geoStatus 확정되면 위 effect가 처리
+    } else if (geoStatus === 'granted' && geoRef.current) {
+      const { lat, lng } = geoRef.current;
+      saveMyOrigin(roomId, lat, lng, '현재 위치')
+        .then(() => setMyOrigin({ userId: currentUserId, lat, lng, label: '현재 위치' }))
+        .catch(() => {});
+    }
+    // geoStatus === 'denied' → 출발지 null 유지, "출발지 미입력" 표시
+  };
+
   useEffect(() => {
     if (!mapReady) return;
     const visiblePlaces = categoryFilter === 'ALL'
@@ -113,15 +190,15 @@ export default function MapView({ roomId }) {
     });
   }, [mapReady, candidates, categoryFilter]);
 
-  // 후보지 또는 이동수단 변경 시 참여자별 이동 시간 조회
+  // 후보지 변경 시 내 자동차 이동 시간만 조회 (출발지 미입력 시 호출하지 않음)
   useEffect(() => {
-    if (!activePlace || !roomId) return;
+    if (!activePlace || !roomId || !myOrigin) return;
     setLoadingTravel(true);
-    getTravelTimes(roomId, activePlace.id, transport)
-      .then((res) => setTravelTimes(activePlace.id, res.data.data ?? []))
-      .catch(() => setTravelTimes(activePlace.id, []))
+    getMyTravelTime(roomId, activePlace.id, TRANSPORT)
+      .then((res) => setTravelTime(activePlace.id, res.data.data ?? null))
+      .catch(() => setTravelTime(activePlace.id, null))
       .finally(() => setLoadingTravel(false));
-  }, [activePlace, transport, roomId]);
+  }, [activePlace, roomId, myOrigin]);
 
   const handleSearch = async () => {
     const query = searchQuery.trim();
@@ -239,6 +316,17 @@ export default function MapView({ roomId }) {
           placeName={pendingResult.name}
           onConfirm={handleCategoryConfirm}
           onCancel={() => setPendingResult(null)}
+        />
+      )}
+
+      {/* 출발지 입력 모달 — 장소 탭 진입 시 출발지가 없으면 자동으로 뜸 */}
+      {originLoaded && showOriginModal && (
+        <OriginModal
+          roomId={roomId}
+          currentLocationAvailable={geoStatus === 'granted'}
+          onConfirm={handleOriginConfirm}
+          onUseCurrentLocation={handleUseCurrentLocationForOrigin}
+          onSkip={handleSkipOrigin}
         />
       )}
 
@@ -389,39 +477,33 @@ export default function MapView({ roomId }) {
         {activePlace && (
           <div className={styles.travelPanel}>
             <div className={styles.travelHeader}>
-              <span><strong>{activePlace.name}</strong>까지의 이동 시간</span>
-              <div className={styles.transportTabs}>
-                {[['TRANSIT', '대중교통'], ['CAR', '자동차'], ['WALK', '도보']].map(([key, label]) => (
-                  <button
-                    key={key}
-                    className={`${styles.transportBtn} ${transport === key ? styles.transportBtnActive : ''}`}
-                    onClick={() => setTransport(key)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <span><strong>{activePlace.name}</strong>까지의 자동차 이동 시간</span>
             </div>
             <div className={styles.travelList}>
-              {participants.length === 0 ? (
-                <p className={styles.emptyMsg}>참여자 이동 시간 정보가 없습니다.</p>
+              {!myOrigin ? (
+                <div className={styles.originMissing}>
+                  <p className={styles.emptyMsg}>출발지를 입력하면 내 이동 시간을 볼 수 있어요.</p>
+                  <button className={styles.originSetBtn} onClick={() => setShowOriginModal(true)}>
+                    출발지 입력하기
+                  </button>
+                </div>
               ) : loadingTravel ? (
                 <p className={styles.emptyMsg}>조회 중...</p>
               ) : (
-                participants.map((p) => {
-                  const result = (travelTimes[activePlace.id] ?? [])
-                    .find((t) => String(t.userId) === String(p.id));
-                  return (
-                    <div key={p.id} className={styles.travelRow}>
-                      <span>{p.name}</span>
-                      <span className={styles.duration}>
-                        {result ? `${result.durationMin}분` : '정보 없음'}
-                      </span>
-                    </div>
-                  );
-                })
+                <div className={styles.travelRow}>
+                  <span>내 이동 시간</span>
+                  <span className={styles.duration}>
+                    {travelTimes[activePlace.id] ? `${travelTimes[activePlace.id].durationMin}분` : '정보 없음'}
+                  </span>
+                </div>
               )}
             </div>
+            {myOrigin && (
+              <div className={styles.originInfo}>
+                <span className={styles.originLabel}>출발지: {myOrigin.label || '내 위치'}</span>
+                <button className={styles.originEditBtn} onClick={() => setShowOriginModal(true)}>변경</button>
+              </div>
+            )}
           </div>
         )}
       </div>
